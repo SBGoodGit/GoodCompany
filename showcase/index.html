@@ -1,0 +1,2150 @@
+<!DOCTYPE html>
+<!-- Versiegeschiedenis:
+v1.000 (07-07-2026): Baseline voor versietracking — dubbelklik-op-selecteer-alles override verwijderd; quoteTotalInput na indienen offerte readonly i.p.v. disabled zodat tekst selecteerbaar blijft
+v1.100 (08-07-2026): Flow #1 (Escrow & Milestones), #2 (Warranty & Holdback), #3 (Profiel Rookie Stage & Reviews), #4 (Technische Intake vragenbibliotheek) toegevoegd aan Contractdetail/Profiel/Negotiation Workspace — zie GoodCompany_ClaudeCode_Implementatieopdracht_Showmodel.md
+v1.200 (09-07-2026): Reviewronde — .tab-stijl herzien naar kaartjes-vormgeving; alert() in reviewformulier vervangen door inline foutmelding; Change Order-vervaltermijn zichtbaar gemaakt. Community Bank-leningaanvraag alsnog volledig gebouwd (4-staps flow: aanvraag/onderbouwing/steekproef & stemmen/uitkomst). Walkthrough-pagina toegevoegd aan sidebar.
+v1.210 (09-07-2026): Bugfix — stemsimulatie Community Bank capte op audience (300) i.p.v. required (100); simulatieknop verdwijnt nu zodra benodigde stemmen bereikt zijn.
+v1.300 (09-07-2026): Flow A — AVI-onboarding (gesimuleerd, drietraps-bootstrap + segmentmodel) toegevoegd, bereikbaar vanuit Profiel. Flow B — Payment/Bank Coupling toegevoegd (koppel-flow, step-up herauthenticatie + asynchrone providerbevestiging, geïntegreerd in mijlpaal-goedkeuring). Walkthrough-pagina bijgewerkt met beide nieuwe onderdelen.
+v1.400 (09-07-2026): Change Order Conversation-structuur (motivatie/acceptatie met optionele toelichting/afwijzing met verplichte reden) + intrekking via wederzijdse instemming (twee-staps simulatie). Prefer/Avoid-markering toegevoegd aan Contacts. Community Bank reserve-bedragen naast percentages op Dashboard en Community Bank-pagina. Walkthrough-pagina bijgewerkt met alle vier toevoegingen.
+-->
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoodCompany — MVP 1 Showmodel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --teal:#5CBDC7; --teal-dark:#3E9BA5; --teal-tint:#EAF6F7;
+    --orange:#F39221; --orange-tint:#FDEBD3;
+    --ink:#1B2426; --slate:#64748B; --slate-light:#9AA6B2;
+    --bg:#F4F6F6; --surface:#FFFFFF; --border:#E7ECED;
+    --success:#1F8A4C; --success-tint:#E5F5EA;
+    --danger:#D9534F; --danger-tint:#FCEAEA;
+    --info:#3E7BD9; --info-tint:#E9F0FC;
+    --sidebar-w:236px;
+  }
+  *{box-sizing:border-box;}
+  input, textarea{user-select:text;-webkit-user-select:text;}
+  body{margin:0;font-family:Arial, Helvetica, sans-serif;background:var(--bg);color:var(--ink);font-size:14px;}
+  h1,h2,h3,.brand,.navlabel,.card-title,.pill,button,.stat-frac{font-family:'Montserrat',Arial,sans-serif;}
+  a{color:inherit;text-decoration:none;}
+  button{cursor:pointer;font-family:'Montserrat',Arial,sans-serif;}
+  
+
+  .app{display:flex;min-height:100vh;}
+
+  /* ---------- Sidebar: light, icon+label, subtle active indicator ---------- */
+  .sidebar{
+    width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
+    padding:20px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 10px 22px;}
+  .brand .mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;}
+  .brand .txt span{display:block;font-weight:800;font-size:15px;letter-spacing:-0.01em;color:var(--ink);}
+  .brand .txt small{display:block;color:var(--slate);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase;}
+
+  .navgroup-title{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--slate-light);margin:18px 10px 6px;font-weight:700;}
+  .navitem{
+    display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:8px;margin-bottom:1px;
+    color:#3A4750;font-size:13px;font-weight:600;border:none;background:none;width:100%;text-align:left;
+    border-left:3px solid transparent;
+  }
+  .navitem:hover{background:#F2F8F8;}
+  .navitem.active{background:var(--teal-tint);color:var(--teal-dark);border-left-color:var(--teal);}
+  .navitem .ic{width:18px;text-align:center;font-size:14px;color:var(--slate-light);}
+  .navitem.active .ic{color:var(--teal-dark);}
+  .navitem.disabled{color:var(--slate-light);cursor:default;}
+  .navitem.disabled:hover{background:none;}
+  .soon-tag{margin-left:auto;font-size:9px;background:var(--orange-tint);color:#A8590C;padding:2px 6px;border-radius:20px;letter-spacing:.04em;font-weight:700;}
+
+  .main{flex:1;min-width:0;}
+
+  /* ---------- Topbar: search + quick actions, Perfex-style ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:18px;padding:14px 28px;
+    background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;
+  }
+  .searchbar{
+    flex:1;max-width:420px;display:flex;align-items:center;gap:8px;background:var(--bg);
+    border:1px solid var(--border);border-radius:9px;padding:8px 14px;color:var(--slate);font-size:13px;
+  }
+  .searchbar .ic{color:var(--slate-light);}
+  .quickadd{
+    width:34px;height:34px;border-radius:9px;background:var(--orange);color:#fff;border:none;
+    font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;
+  }
+  .quickadd:hover{background:#DA7F14;}
+  .topbar-spacer{flex:1;}
+  .icon-btn{position:relative;width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--slate);font-size:14px;}
+  .icon-btn:hover{background:var(--bg);}
+  .icon-btn .count{
+    position:absolute;top:-6px;right:-6px;background:var(--orange);color:#fff;font-size:9px;font-weight:800;
+    min-width:16px;height:16px;border-radius:20px;display:flex;align-items:center;justify-content:center;padding:0 3px;
+  }
+  .badge-sim{background:var(--orange-tint);color:#A8590C;font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:20px;letter-spacing:.02em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+  .badge-sim::before{content:"●";color:var(--orange);font-size:7px;}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;}
+  .page-heading{padding:20px 28px 4px;}
+  .page-heading h1{font-size:19px;margin:0;font-weight:700;}
+  .page-heading .sub{font-size:12.5px;color:var(--slate);margin-top:2px;}
+
+  .content{padding:8px 28px 60px;max-width:1240px;}
+
+  /* ---------- Cards ---------- */
+  .grid{display:grid;gap:16px;}
+  .grid-4{grid-template-columns:repeat(4,1fr);}
+  .grid-3{grid-template-columns:repeat(3,1fr);}
+  .grid-2{grid-template-columns:1.4fr 1fr;}
+  .grid-2b{grid-template-columns:1fr 1fr;}
+  @media (max-width:980px){.grid-4{grid-template-columns:repeat(2,1fr);}.grid-3{grid-template-columns:1fr;}.grid-2,.grid-2b{grid-template-columns:1fr;}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(20,30,32,0.03);}
+  .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .card-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .card-title .ic{color:var(--teal-dark);font-size:14px;}
+  .drag{color:var(--slate-light);font-size:12px;letter-spacing:1px;cursor:grab;user-select:none;}
+  .card-link{font-size:11.5px;font-weight:700;color:var(--teal-dark);}
+
+  /* KPI strip (Perfex-style: title+fraction, thin bar underneath) */
+  .kpi{border-top:none;}
+  .kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .kpi-top .lbl{font-size:12.5px;font-weight:700;color:#3A4750;display:flex;align-items:center;gap:8px;}
+  .kpi-top .lbl .ic{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
+  .kpi-frac{font-size:13px;font-weight:800;color:var(--ink);}
+  .thinbar{background:#EEF1F1;border-radius:20px;height:6px;overflow:hidden;}
+  .thinbar > div{height:100%;border-radius:20px;}
+
+  /* Overview rows: label ... % right, bar below (Invoice/Estimate/Proposal style) */
+  .ov-row{margin-bottom:13px;}
+  .ov-row:last-child{margin-bottom:0;}
+  .ov-top{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-bottom:5px;}
+  .ov-top .lbl{color:#3A4750;}
+  .ov-top .val{color:var(--slate);font-weight:600;}
+
+  /* Data table with colored left border rows, Perfex-style */
+  .dtable .drow{
+    display:flex;align-items:center;gap:14px;padding:12px 14px 12px 12px;border-left:4px solid var(--border);
+    background:var(--surface);border-bottom:1px solid var(--border);
+  }
+  .dtable .drow:last-child{border-bottom:none;}
+  .dtable .drow.sev-open{border-left-color:var(--success);}
+  .dtable .drow.sev-dormant{border-left-color:var(--slate-light);}
+  .dtable .drow.sev-closed{border-left-color:var(--border);}
+  .dtable .drow.sev-active{border-left-color:var(--teal);}
+  .dtable .drow.sev-completed{border-left-color:var(--success);}
+  .dtable .drow.sev-frozen{border-left-color:var(--danger);}
+  .drow .dr-main{flex:1;min-width:0;}
+  .drow .dr-title{font-weight:700;font-size:13px;}
+  .drow .dr-sub{font-size:11.5px;color:var(--slate);margin-top:2px;}
+  .drow .dr-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.02em;white-space:nowrap;}
+  .pill.open{background:var(--success-tint);color:var(--success);}
+  .pill.dormant{background:#EEF1F1;color:var(--slate);}
+  .pill.closed{background:#EEF1F1;color:var(--slate-light);}
+  .pill.active{background:var(--teal-tint);color:var(--teal-dark);}
+  .pill.completed{background:var(--success-tint);color:var(--success);}
+  .pill.funded, .pill.verified{background:var(--teal-tint);color:var(--teal-dark);}
+  .pill.pending{background:var(--orange-tint);color:#A8590C;}
+  .pill.frozen{background:var(--danger-tint);color:var(--danger);}
+  .pill.linked{background:var(--teal-tint);color:var(--teal-dark);}
+  .pill.unlinked{background:#EEF1F1;color:var(--slate-light);}
+  .pill.submitted{background:var(--info-tint);color:var(--info);}
+  .pill.rejected{background:var(--danger-tint);color:var(--danger);}
+  .pill.paid{background:var(--success-tint);color:var(--success);}
+  .pill.proposed{background:var(--orange-tint);color:#A8590C;}
+  .pill.accepted{background:var(--success-tint);color:var(--success);}
+  .pill.withdrawn{background:#EEF1F1;color:var(--slate);}
+
+  /* ---------- Milestone / Change Order cards (Flow #1) ---------- */
+  .milestone-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--surface);}
+  .milestone-card.st-rejected{border-color:var(--danger);background:var(--danger-tint);}
+  .milestone-card.st-paid{border-color:var(--success);background:var(--success-tint);}
+  .milestone-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .milestone-title{font-weight:700;font-size:13px;}
+  .milestone-sub{font-size:11.5px;color:var(--slate);margin-top:2px;}
+  .fee-note{font-size:11px;color:var(--slate);margin-top:6px;}
+  .field-error{font-size:11px;color:var(--danger);margin-top:6px;font-weight:600;}
+  .reject-box{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);}
+
+  /* ---------- Holdback timeline (Flow #2) ---------- */
+  .hb-timeline{display:flex;align-items:flex-start;gap:0;margin:18px 0 8px;overflow-x:auto;}
+  .hb-step{flex:1;min-width:120px;text-align:center;position:relative;padding-top:18px;}
+  .hb-step::before{content:"";position:absolute;top:5px;left:0;right:0;height:2px;background:var(--border);}
+  .hb-step:first-child::before{left:50%;}
+  .hb-step:last-child::before{right:50%;}
+  .hb-dot{position:absolute;top:0;left:50%;transform:translateX(-50%);width:11px;height:11px;border-radius:50%;background:var(--border);border:2px solid var(--surface);}
+  .hb-step.done .hb-dot{background:var(--success);}
+  .hb-step.frozen .hb-dot{background:var(--danger);}
+  .hb-step.current .hb-dot{background:var(--orange);}
+  .hb-lbl{font-size:11px;font-weight:700;color:var(--ink);margin-top:2px;}
+  .hb-amt{font-size:12px;font-weight:700;color:var(--slate);}
+  .hb-status{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+  .hb-status.done{color:var(--success);}
+  .hb-status.frozen{color:var(--danger);}
+  .hb-status.pending{color:var(--slate-light);}
+
+  .warranty-badge{border:1px solid var(--border);border-radius:10px;padding:12px 16px;background:var(--teal-tint);font-size:12px;color:var(--teal-dark);font-weight:700;display:flex;gap:18px;flex-wrap:wrap;}
+  .warranty-badge .wb-item span{display:block;font-size:10px;font-weight:600;color:var(--slate);text-transform:none;margin-top:2px;}
+  .priority{font-size:11.5px;font-weight:700;}
+  .priority.high{color:var(--danger);}
+  .priority.medium{color:var(--info);}
+  .priority.low{color:var(--slate);}
+
+  /* Donut chart via conic-gradient */
+  .donut-wrap{display:flex;align-items:center;gap:22px;}
+  .donut{width:126px;height:126px;border-radius:50%;flex-shrink:0;position:relative;}
+  .donut::after{content:"";position:absolute;inset:20px;background:var(--surface);border-radius:50%;}
+  .legend{display:flex;flex-direction:column;gap:8px;}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#3A4750;font-weight:600;}
+  .legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+
+  /* Bar chart */
+  .barchart{display:flex;align-items:flex-end;gap:14px;height:170px;padding-top:6px;}
+  .barchart .bcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;}
+  .barchart .bar{width:60%;border-radius:6px 6px 0 0;}
+  .barchart .bcol span{font-size:10.5px;color:var(--slate);font-weight:600;}
+
+  /* Stage tracker — signature element mirroring the build spec state machines */
+  .stage-tracker{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:14px 0 6px;}
+  .stage{display:flex;align-items:center;}
+  .stage .node{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:20px;font-size:11.5px;font-weight:700;background:#EEF1F1;color:var(--slate-light);white-space:nowrap;}
+  .stage .node.done{background:var(--teal-tint);color:var(--teal-dark);}
+  .stage .node.current{background:var(--teal);color:#0E2224;}
+  .stage-connector{width:20px;height:2px;background:var(--border);margin:0 2px;}
+
+  .btn{background:var(--teal);color:#0E2224;border:none;padding:9px 16px;border-radius:8px;font-weight:700;font-size:12.5px;}
+  .btn:hover{background:var(--teal-dark);color:#fff;}
+  .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--ink);}
+  .btn.ghost:hover{background:var(--teal-tint);border-color:var(--teal);}
+  .btn:focus-visible, .navitem:focus-visible, .icon-btn:focus-visible{outline:2px solid var(--orange);outline-offset:2px;}
+
+  .mini-stat{border-left:4px solid var(--border);padding:12px 16px;border-radius:8px;background:var(--surface);border-top:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .mini-stat.c-orange{border-left-color:var(--orange);}
+  .mini-stat.c-slate{border-left-color:var(--slate-light);}
+  .mini-stat.c-teal{border-left-color:var(--teal);}
+  .mini-stat .m-lbl{font-size:11.5px;color:var(--slate);font-weight:600;}
+  .mini-stat .m-val{font-size:19px;font-weight:800;margin-top:4px;}
+
+  .tabs{display:flex;gap:8px;border-bottom:none;margin-bottom:16px;overflow-x:auto;}
+  .tab{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12.5px;font-weight:700;color:var(--slate);white-space:nowrap;box-shadow:0 1px 2px rgba(20,30,32,0.03);}
+  .tab:hover{background:var(--teal-tint);border-color:var(--teal);}
+  .tab.active{color:var(--teal-dark);border-color:var(--teal);background:var(--teal-tint);}
+
+  .accordion-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;padding:0;color:var(--slate);font-size:14px;}
+  .filter-select{border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12.5px;color:var(--ink);background:var(--surface);font-family:Arial,sans-serif;}
+  .btn-sm{padding:6px 12px;font-size:11.5px;border-radius:7px;}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,30,32,0.42);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .modal{background:var(--surface);border-radius:14px;width:440px;max-width:92vw;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,0.2);}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+  .modal-close{background:none;border:none;color:var(--slate);font-size:15px;}
+  .modal-body{display:flex;flex-direction:column;gap:4px;}
+  .field-label{font-size:11.5px;font-weight:700;color:var(--slate);margin:10px 0 4px;}
+  .field-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:Arial,sans-serif;color:var(--ink);background:var(--bg);user-select:text;-webkit-user-select:text;}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+
+  .chat-thread{display:flex;flex-direction:column;gap:10px;max-height:260px;overflow-y:auto;padding-right:4px;}
+  .chat-bubble{max-width:78%;padding:9px 13px;border-radius:12px;font-size:13px;line-height:1.45;}
+  .chat-bubble.client{align-self:flex-start;background:#EEF1F1;color:var(--ink);border-bottom-left-radius:3px;}
+  .chat-bubble.contractor{align-self:flex-end;background:var(--teal-tint);color:var(--teal-dark);border-bottom-right-radius:3px;}
+  .chat-bubble .cb-role{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.65;margin-bottom:3px;}
+
+  .gc-toast{
+    position:fixed;bottom:24px;right:24px;max-width:360px;background:var(--ink);color:#fff;
+    padding:14px 18px;border-radius:10px;font-size:12.5px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    opacity:0;transform:translateY(12px);transition:opacity .25s ease, transform .25s ease;pointer-events:none;z-index:100;
+  }
+  .gc-toast.show{opacity:1;transform:translateY(0);}
+
+  .contact-group{margin-bottom:20px;}
+  .contact-group h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--slate);margin-bottom:8px;font-weight:700;}
+  .contact-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .contact-item:last-child{border-bottom:none;}
+  .dot-status{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dot-status.linked{background:var(--teal);}
+  .dot-status.unlinked{background:var(--slate-light);}
+
+  .empty-module{text-align:center;padding:70px 20px;color:var(--slate);}
+  .empty-module .tag{display:inline-block;background:var(--orange-tint);color:#A8590C;font-weight:700;font-size:11.5px;padding:6px 14px;border-radius:20px;margin-bottom:16px;}
+  .empty-module h2{color:var(--ink);margin-bottom:8px;}
+  .empty-module p{max-width:420px;margin:0 auto;font-size:13.5px;line-height:1.6;}
+
+  @media (prefers-reduced-motion: reduce){*{transition:none !important;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main">
+    <div class="topbar">
+      <div class="searchbar"><span class="ic">⌕</span><span>Zoeken in GoodCompany…</span></div>
+      <button class="quickadd" title="Snel toevoegen">+</button>
+      <div class="topbar-spacer"></div>
+      <span class="badge-sim">MVP 1 showmodel — gesimuleerde data</span>
+      <button class="icon-btn">✓<span class="count">3</span></button>
+      <button class="icon-btn">🔔<span class="count">1</span></button>
+      <div class="avatar">SB</div>
+    </div>
+    <div class="page-heading">
+      <h1 id="pageTitle">Dashboard</h1>
+      <div class="sub" id="pageSub">Overzicht van al je GoodCompany-activiteit</div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="jobModalOverlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="card-title" style="font-size:14px;">Nieuwe job plaatsen</div>
+      <button class="modal-close" onclick="closeJobModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Titel</label>
+      <input class="field-input" id="jm-title" placeholder="Bijv. Website herbouwen in Vue/Nuxt">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;">
+          <label class="field-label">Regio</label>
+          <input class="field-input" id="jm-region" placeholder="Bijv. Nijmegen of Remote">
+        </div>
+        <div style="flex:1;">
+          <label class="field-label">Urgentie</label>
+          <select class="field-input" id="jm-priority"><option value="low">Laag</option><option value="medium" selected>Middel</option><option value="high">Hoog</option></select>
+        </div>
+      </div>
+      <label class="field-label">Indicatief budget (optioneel — nooit publiek zichtbaar op de listing, alleen ter referentie voor jezelf totdat je het zelf inbrengt in een onderhandeling)</label>
+      <input class="field-input" id="jm-budget" placeholder="Bijv. €2.500 — mag leeg blijven">
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeJobModal()">Annuleren</button>
+      <button class="btn" onclick="submitJobModal()">Job plaatsen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="contactModalOverlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="card-title" style="font-size:14px;">Nieuw contact toevoegen</div>
+      <button class="modal-close" onclick="closeContactModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Naam</label>
+      <input class="field-input" id="cm-name" placeholder="Bijv. Piet Bakker">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;"><label class="field-label">Telefoonnummer</label><input class="field-input" id="cm-phone" placeholder="Optioneel"></div>
+        <div style="flex:1;"><label class="field-label">E-mailadres</label><input class="field-input" id="cm-email" placeholder="Optioneel"></div>
+      </div>
+      <label class="field-label">Groep</label>
+      <select class="field-input" id="cm-group"></select>
+      <label class="field-label">Uitnodigingskanaal (indien nog geen GC-account)</label>
+      <select class="field-input" id="cm-channel"><option>E-mail</option><option>WhatsApp (gesimuleerd — nog niet geïntegreerd)</option></select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeContactModal()">Annuleren</button>
+      <button class="btn" onclick="submitContactModal()">Contact toevoegen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="groupModalOverlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="card-title" style="font-size:14px;">Nieuwe groep aanmaken</div>
+      <button class="modal-close" onclick="closeGroupModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Groepsnaam</label>
+      <input class="field-input" id="gm-name" placeholder="Bijv. Leveranciers chemie">
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeGroupModal()">Annuleren</button>
+      <button class="btn" onclick="submitGroupModal()">Groep aanmaken</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="stepUpModalOverlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="card-title" style="font-size:14px;">Bevestig deze actie opnieuw</div>
+      <button class="modal-close" onclick="cancelStepUp()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--slate);margin:0;">Elke actie die geld verplaatst vereist directe herauthenticatie, ook binnen een actieve sessie.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="cancelStepUp()">Annuleren</button>
+      <button class="btn" onclick="confirmStepUp()">Bevestigen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Simulated data (in-memory only — no backend, no blockchain) ---------- */
+const state = {
+  view: "dashboard",
+  jobs: [
+    { title: "Website herbouwen in Vue/Nuxt", status: "open", region: "Nijmegen", responses: 3, priority:"high" },
+    { title: "Elektra aanleggen nieuwbouwwoning", status: "dormant", region: "Arnhem", responses: 1, priority:"medium" },
+    { title: "Logo & huisstijl kleine onderneming", status: "closed", region: "Remote", responses: 5, priority:"low" }
+  ],
+  contracts: [
+    { title: "Website herbouwen — Studio Vellema", status: "active", amount: "€4.200", amountValue:4200, escrow: "funded", priority:"high",
+      paymentRoute: "phased",
+      milestones: [
+        { desc:"Bij start", pct:25, status:"paid" },
+        { desc:"Design fase", pct:25, status:"rejected", rejectReason:"Kleurenpalet wijkt af van de huisstijl-eisen uit het intake-gesprek — graag herzien vóór volgende indiening." },
+        { desc:"Ontwikkeling", pct:25, status:"submitted" },
+        { desc:"Oplevering", pct:25, status:"pending" }
+      ],
+      changeOrders: [],
+      finalEvaluation: { clientSigned:false, contractorSigned:false, invoiceGenerated:false },
+      warranty: { periodDays:30, holdbackPct:10, status:"not_started", startDate:null, simDay:0, claim:null },
+      review: { stars:0, text:"", submitted:false }
+    },
+    { title: "Verbouwing dakkapel", status: "completed", amount: "€9.800", amountValue:9800, escrow: "released", priority:"low",
+      paymentRoute: "lump_sum",
+      milestones: [],
+      changeOrders: [],
+      finalEvaluation: { clientSigned:true, contractorSigned:true, invoiceGenerated:true },
+      warranty: { periodDays:90, holdbackPct:15, status:"frozen", startDate:"2026-05-10", simDay:38,
+        claim:{ description:"Kozijn van de dakkapel lekt bij zware regen — ontstaan na oplevering.", openedDay:38 } },
+      review: { stars:4, text:"Prima samenwerking, kleine planningsvertraging bij de laatste fase.", submitted:true }
+    },
+    { title: "Interieuradvies kantoorpand", status: "completed", amount: "€2.600", amountValue:2600, escrow: "released", priority:"medium",
+      paymentRoute: "lump_sum",
+      milestones: [],
+      changeOrders: [],
+      finalEvaluation: { clientSigned:true, contractorSigned:true, invoiceGenerated:true },
+      warranty: { periodDays:30, holdbackPct:10, status:"active", startDate:"2026-06-20", simDay:15, claim:null },
+      review: { stars:2, text:"Communicatie liep niet altijd soepel, het eindresultaat was uiteindelijk wel naar wens.", submitted:true }
+    }
+  ],
+  profileView: "rookie",
+  profiles: {
+    rookie: { name:"Merel J.", initials:"MJ", role:"ZZP · Interieurstyling", completed:6 },
+    full: { name:"Sander B.", initials:"SB", role:"ZZP · Grafisch ontwerp & concept", completed:12, score:4.8, reviewCount:23 }
+  },
+  reviews: [
+    { stars:4, text:"Prima samenwerking, kleine planningsvertraging bij de laatste fase.", contractTitle:"Verbouwing dakkapel" },
+    { stars:2, text:"Communicatie liep niet altijd soepel, het eindresultaat was uiteindelijk wel naar wens.", contractTitle:"Interieuradvies kantoorpand" },
+    { stars:5, text:"", contractTitle:"Logo & huisstijl kleine onderneming" },
+    { stars:5, text:"", contractTitle:"Bedrijfswebsite fase 1" }
+  ],
+  workspaceStage: "introduction",
+  completedOpen: false,
+  contractDetailIndex: null,
+  contractDetailTab: "overview",
+  activeRejectBox: null,
+  changeOrderForm: { open:false, desc:"", amount:"", motivation:"" },
+  activeCoRejectBox: null,
+  claimForm: { open:false, text:"" },
+  expandedContact: null,
+  wsDetail: {
+    messages: [
+      { from:"client", text:"Hi! Ik zag je reactie op mijn job — kun je iets vertellen over je aanpak?" },
+      { from:"contractor", text:"Zeker, ik werk meestal met Nuxt 3 + een headless CMS. Zal ik een korte technische intake insturen?" }
+    ],
+    questionLibrary: [
+      { q:"Welke technologie-voorkeur heb je (indien van toepassing)?", selected:true },
+      { q:"Wat is de gewenste opleverdatum?", selected:true },
+      { q:"Zijn er bestaande systemen waarmee dit moet koppelen?", selected:true },
+      { q:"Is er een stijlgids of huisstijl die aangehouden moet worden?", selected:false },
+      { q:"Wie is het primaire aanspreekpunt tijdens het traject?", selected:false },
+      { q:"Zijn er specifieke toegankelijkheidseisen (bijv. WCAG)?", selected:false },
+      { q:"In welke talen moet het eindresultaat beschikbaar zijn?", selected:false },
+      { q:"Is er een bestaand ontwerp of prototype als uitgangspunt?", selected:false }
+    ],
+    customQuestions: [],
+    customQuestionDraft: "",
+    intakeAnswers: {},
+    terms: { workingHours:"", commChannel:"", warrantyPeriodDays:30, ownership:"", cancellation:"", phases:[{pct:50,desc:"Bij start"},{pct:50,desc:"Bij oplevering"}] },
+    termsAccepted:false,
+    quoteTotal: 4200,
+    quoteSubmitted:false,
+    quoteAccepted:false,
+    signatures:{client:false, contractor:false}
+  },
+  communityBankTotal: 42000,
+  reserves: [
+    { name: "Safety", pct: 61, threshold: 55, color:"var(--teal)" },
+    { name: "Credit", pct: 24, color:"var(--orange)" },
+    { name: "Legal", pct: 9, color:"var(--info)" },
+    { name: "Innovation", pct: 6, color:"var(--slate-light)" }
+  ],
+  loans: [
+    { purpose: "Aanschaf compressor (aannemer)", amount: "€2.400", votesFor: 68, required: 100, votes: 61, audience: 300 },
+    { purpose: "Bedrijfsbusje (koerier)", amount: "€6.000", votesFor: 42, required: 100, votes: 34, audience: 300 }
+  ],
+  contacts: {
+    "Timmermannen": [
+      { name: "Kees Broersma", linked: true, phone: "06-12345678", email: "kees@broersmatimmerwerk.nl" },
+      { name: "J. de Groot Bouw", linked: false, phone: "06-87654321", email: "" }
+    ],
+    "Leveranciers": [
+      { name: "BouwmaterialenNU", linked: true, phone: "024-1234567", email: "verkoop@bouwmaterialennu.nl" },
+      { name: "Elektro Groothandel Oost", linked: false, phone: "", email: "info@elektrogroothandeloost.nl" }
+    ]
+  },
+  payments: [1200, 0, 2900, 0, 8400, 0, 0],
+  loanApplication: {
+    stage: "aanvraag",
+    purpose: "",
+    amount: "",
+    category: "Uitrusting",
+    motivation: "",
+    votes: 0,
+    votesFor: 0,
+    required: 100,
+    audience: 300,
+    simRounds: 0
+  },
+  avi: { stage:"intro", chipScanning:false, chipDone:false, bioScanning:false, bioDone:false, digidScanning:false, digidDone:false },
+  bankCoupling: { status:"not_linked" }, // not_linked | pending | linked
+  stepUpPending: null
+};
+
+const nav = [
+  { id: "walkthrough", label: "Walkthrough", icon: "?", group: "main" },
+  { id: "dashboard", label: "Dashboard", icon: "◆", group: "main" },
+  { id: "marketplace", label: "Marketplace", icon: "▤", group: "main" },
+  { id: "contacts", label: "Contacts", icon: "◔", group: "main" },
+  { id: "goodtrade", label: "GoodTrade", icon: "⇄", group: "main" },
+  { id: "communitybank", label: "Community Bank", icon: "◈", group: "main" },
+  { id: "profile", label: "Profiel", icon: "●", group: "main" },
+  { id: "dispute", label: "Dispute Center", icon: "!", group: "soon", soon: true },
+  { id: "innovation", label: "Innovation Fund", icon: "✦", group: "soon", soon: true },
+  { id: "plugins", label: "Plugin Marketplace", icon: "▣", group: "soon", soon: true },
+];
+const titles = {
+  dashboard: ["Dashboard","Overzicht van al je GoodCompany-activiteit"],
+  marketplace: ["Marketplace","Jobs zoeken, posten en beheren"],
+  contacts: ["Contacts & Inner Circles","Je georganiseerde adresboek van GC-relaties"],
+  goodtrade: ["GoodTrade","Van onderhandeling tot sign-off"],
+  workspace: ["Negotiation Workspace","Website herbouwen — Studio Vellema"],
+  contractDetail: ["Contractdetail","Volledig traject, ongeacht huidige fase"],
+  communitybank: ["Community Bank","Reserves, leningen en stemmen"],
+  profile: ["Profiel","Je publieke reputatie en statistieken"],
+  dispute: ["Dispute Center",""], innovation: ["Innovation Fund",""], plugins: ["Plugin Marketplace",""],
+  loanApplication: ["Leningaanvraag","Community Bank — nieuwe aanvraag"],
+  walkthrough: ["Walkthrough","Wat kun je in dit showmodel zien?"],
+  avi: ["AVI-onboarding","Identiteit verifiëren (gesimuleerd)"],
+  bankCoupling: ["Bankkoppeling","Referentietoken via een gelicentieerde betaalprovider"]
+};
+
+/* ---------- Flow #1: Escrow & Milestones — helpers ---------- */
+const PLATFORM_FEE = 0.02;
+function fmtEUR(n){ return "€"+Math.round(n).toLocaleString('nl-NL'); }
+function milestoneAmount(c, m){ return c.amountValue * m.pct/100; }
+function payoutAfterFee(gross){ return gross - gross*PLATFORM_FEE; }
+function feeAmount(gross){ return gross*PLATFORM_FEE; }
+
+function submitMilestone(ci, mi){
+  state.contracts[ci].milestones[mi].status = "submitted";
+  render();
+}
+window.submitMilestone = submitMilestone;
+
+function requestApproveMilestone(ci, mi){
+  requestStepUp(()=>approveMilestone(ci, mi));
+}
+window.requestApproveMilestone = requestApproveMilestone;
+
+function approveMilestone(ci, mi){
+  const m = state.contracts[ci].milestones[mi];
+  m.payoutPending = true; // async settlement — nooit alleen op een synchrone reactie vertrouwen (Payment/Bank Coupling clausule 4)
+  render();
+}
+window.approveMilestone = approveMilestone;
+
+function finalizeMilestonePayout(ci, mi){
+  const c = state.contracts[ci], m = c.milestones[mi];
+  m.status = "paid";
+  m.payoutPending = false;
+  render();
+  const gross = milestoneAmount(c, m);
+  showToast(`${fmtEUR(gross)} vrijgegeven uit escrow voor "${m.desc}" — uitbetaald: ${fmtEUR(payoutAfterFee(gross))} (incl. 2% platformvergoeding).`);
+}
+window.finalizeMilestonePayout = finalizeMilestonePayout;
+
+/* ---------- Step-up re-authentication (Payment/Bank Coupling clausule 3) ---------- */
+function requestStepUp(action){
+  state.stepUpPending = action;
+  document.getElementById("stepUpModalOverlay").style.display = "flex";
+}
+window.requestStepUp = requestStepUp;
+function cancelStepUp(){
+  state.stepUpPending = null;
+  document.getElementById("stepUpModalOverlay").style.display = "none";
+}
+window.cancelStepUp = cancelStepUp;
+function confirmStepUp(){
+  const action = state.stepUpPending;
+  state.stepUpPending = null;
+  document.getElementById("stepUpModalOverlay").style.display = "none";
+  if(action) action();
+}
+window.confirmStepUp = confirmStepUp;
+
+function toggleRejectBox(ci, mi){
+  const key = ci+"|"+mi;
+  state.activeRejectBox = (state.activeRejectBox === key) ? null : key;
+  render();
+}
+window.toggleRejectBox = toggleRejectBox;
+
+function updateRejectDraft(ci, mi, val){
+  state.contracts[ci].milestones[mi]._rejectDraft = val;
+}
+window.updateRejectDraft = updateRejectDraft;
+
+function confirmReject(ci, mi){
+  const m = state.contracts[ci].milestones[mi];
+  const reason = (m._rejectDraft || "").trim();
+  if(!reason){ alert("Een afwijzing vereist een toelichting — vul eerst een reden in."); return; }
+  m.status = "rejected";
+  m.rejectReason = reason;
+  delete m._rejectDraft;
+  state.activeRejectBox = null;
+  render();
+}
+window.confirmReject = confirmReject;
+
+function resubmitMilestone(ci, mi){
+  const m = state.contracts[ci].milestones[mi];
+  m.status = "submitted";
+  render();
+}
+window.resubmitMilestone = resubmitMilestone;
+
+function contractPhaseSum(c){ return c.milestones.reduce((a,m)=>a+Number(m.pct||0),0); }
+
+function toggleChangeOrderForm(){
+  state.changeOrderForm.open = !state.changeOrderForm.open;
+  if(!state.changeOrderForm.open){ state.changeOrderForm.desc=""; state.changeOrderForm.amount=""; state.changeOrderForm.motivation=""; }
+  render();
+}
+window.toggleChangeOrderForm = toggleChangeOrderForm;
+function updateChangeOrderField(field, val){ state.changeOrderForm[field] = val; }
+window.updateChangeOrderField = updateChangeOrderField;
+
+function submitChangeOrder(ci){
+  const f = state.changeOrderForm;
+  const desc = (f.desc||"").trim(), amount = Number(f.amount||0), motivation = (f.motivation||"").trim();
+  if(!desc || !amount || !motivation){ alert("Vul een omschrijving, een bedrag én een motivatie in."); return; }
+  state.contracts[ci].changeOrders.push({
+    desc, amount, motivation,
+    status:"proposed", submitterSigned:true, recipientSigned:false,
+    approvalNote:"", rejectionReason:"",
+    funded:false, withdrawalStatus:null
+  });
+  f.open = false; f.desc=""; f.amount=""; f.motivation="";
+  render();
+  showToast(`Meerwerkvoorstel "${desc}" ingediend (jij hebt als indiener getekend ter leesbevestiging) — wacht op reactie van de wederpartij.`);
+}
+window.submitChangeOrder = submitChangeOrder;
+
+function acceptChangeOrder(ci, coi){
+  const c = state.contracts[ci], co = c.changeOrders[coi];
+  co.status = "accepted"; co.recipientSigned = true;
+  co.approvalNote = (co._approvalDraft||"").trim();
+  delete co._approvalDraft;
+  c.amountValue += co.amount;
+  c.amount = fmtEUR(c.amountValue);
+  render();
+  showToast(`Meerwerk "${co.desc}" geaccepteerd en getekend — nieuw totaalbedrag: ${c.amount}.`);
+}
+window.acceptChangeOrder = acceptChangeOrder;
+function updateApprovalDraft(ci, coi, val){ state.contracts[ci].changeOrders[coi]._approvalDraft = val; }
+window.updateApprovalDraft = updateApprovalDraft;
+
+function toggleCoRejectBox(ci, coi){
+  const key = ci+"|"+coi;
+  state.activeCoRejectBox = (state.activeCoRejectBox === key) ? null : key;
+  render();
+}
+window.toggleCoRejectBox = toggleCoRejectBox;
+function updateCoRejectDraft(ci, coi, val){ state.contracts[ci].changeOrders[coi]._rejectDraft = val; }
+window.updateCoRejectDraft = updateCoRejectDraft;
+function rejectChangeOrder(ci, coi){
+  const co = state.contracts[ci].changeOrders[coi];
+  const reason = (co._rejectDraft || "").trim();
+  if(!reason){ alert("Een afwijzing vereist een toelichting — vul eerst een reden in."); return; }
+  co.status = "rejected";
+  co.rejectionReason = reason;
+  delete co._rejectDraft;
+  state.activeCoRejectBox = null;
+  render();
+}
+window.rejectChangeOrder = rejectChangeOrder;
+
+function requestWithdrawChangeOrder(ci, coi){
+  state.contracts[ci].changeOrders[coi].withdrawalStatus = "requested";
+  render();
+  showToast("Intrekking voorgesteld — wacht op bevestiging wederpartij.");
+}
+window.requestWithdrawChangeOrder = requestWithdrawChangeOrder;
+function confirmWithdrawChangeOrder(ci, coi){
+  const co = state.contracts[ci].changeOrders[coi];
+  co.withdrawalStatus = "withdrawn";
+  co.status = "withdrawn";
+  render();
+  showToast(`Meerwerk "${co.desc}" ingetrokken met wederzijdse instemming (gesimuleerd).`);
+}
+window.confirmWithdrawChangeOrder = confirmWithdrawChangeOrder;
+
+function allMilestonesPaid(c){ return c.paymentRoute==="lump_sum" || (c.milestones.length>0 && c.milestones.every(m=>m.status==="paid")); }
+
+function signFinalEvaluation(ci, role){
+  const c = state.contracts[ci];
+  c.finalEvaluation[role+"Signed"] = true;
+  if(c.finalEvaluation.clientSigned && c.finalEvaluation.contractorSigned){
+    c.finalEvaluation.invoiceGenerated = true;
+    c.status = "completed";
+    c.escrow = "released";
+    if(c.warranty.status === "not_started"){
+      c.warranty.startDate = "vandaag (gesimuleerd)";
+      c.warranty.simDay = 0;
+      c.warranty.status = c.warranty.periodDays>0 ? "active" : "completed";
+    }
+    render();
+    showToast(`Beide handtekeningen ontvangen — contract afgerond. Factuur automatisch gegenereerd (basisbedrag${c.changeOrders.some(o=>o.status==="accepted")?' + geaccepteerd meerwerk':''}).`);
+  } else { render(); }
+}
+window.signFinalEvaluation = signFinalEvaluation;
+
+/* ---------- Flow #2: Warranty & Holdback — helpers ---------- */
+const WARRANTY_HOLDBACK_MAP = {0:0, 15:5, 30:10, 90:15};
+function holdbackSchedule(c){
+  const days = c.warranty.periodDays;
+  const total = c.amountValue;
+  const holdbackAmount = total * c.warranty.holdbackPct/100;
+  if(days===0) return { directRelease: total, holdbackAmount:0, steps: [] };
+  const directRelease = total - holdbackAmount;
+  let dayList;
+  if(days===15) dayList = [15];
+  else if(days===30) dayList = [15,30];
+  else dayList = [30,60,90];
+  const n = dayList.length;
+  let allocated = 0;
+  const steps = dayList.map((day,i)=>{
+    let amt;
+    if(i===n-1){ amt = holdbackAmount - allocated; }
+    else { amt = Math.round(holdbackAmount/n); allocated += amt; }
+    return { day, amount:amt };
+  });
+  return { directRelease, holdbackAmount, steps };
+}
+
+function advanceWarrantyTime(ci){
+  const c = state.contracts[ci], w = c.warranty;
+  if(w.status!=="active") return;
+  const prevDay = w.simDay;
+  w.simDay = Math.min(w.periodDays, w.simDay + 15);
+  const sched = holdbackSchedule(c);
+  const justReleased = sched.steps.filter(s=>s.day<=w.simDay && s.day>prevDay);
+  render();
+  if(justReleased.length){
+    showToast(justReleased.map(s=>`Dag ${s.day}: ${fmtEUR(s.amount)} holdback vrijgegeven.`).join(" "));
+  }
+  if(w.simDay >= w.periodDays){ w.status = "completed"; render(); }
+}
+window.advanceWarrantyTime = advanceWarrantyTime;
+
+function toggleClaimForm(){
+  state.claimForm.open = !state.claimForm.open;
+  if(!state.claimForm.open) state.claimForm.text = "";
+  render();
+}
+window.toggleClaimForm = toggleClaimForm;
+function updateClaimDraft(val){ state.claimForm.text = val; }
+window.updateClaimDraft = updateClaimDraft;
+function submitClaim(ci){
+  const text = (state.claimForm.text||"").trim();
+  if(!text){ alert("Beschrijf eerst het probleem — een claim vereist een omschrijving."); return; }
+  const c = state.contracts[ci];
+  c.warranty.status = "frozen";
+  c.warranty.claim = { description:text, openedDay:c.warranty.simDay };
+  state.claimForm.open = false; state.claimForm.text = "";
+  render();
+  showToast("Geschil gemeld → ticket aangemaakt buiten platform. Het nog niet uitgekeerde deel van de holdback is bevroren; reeds uitbetaalde delen blijven definitief.");
+}
+window.submitClaim = submitClaim;
+
+function switchContractTab(tab){ state.contractDetailTab = tab; render(); }
+window.switchContractTab = switchContractTab;
+
+/* ---------- Flow #3: Profiel — Rookie Stage & Reviews — helpers ---------- */
+const ROOKIE_REVIEWS_REQUIRED = 10; // Configuration Registry: rookie_reviews_required
+const MANDATORY_MOTIVATION_THRESHOLD = 3; // Configuration Registry: mandatory_motivation_threshold — verplicht bij ≤3 sterren
+
+function switchProfileView(v){ state.profileView = v; render(); }
+window.switchProfileView = switchProfileView;
+
+function setReviewStars(ci, n){ const r = state.contracts[ci].review; r.stars = n; r.error = ""; render(); }
+window.setReviewStars = setReviewStars;
+function updateReviewText(ci, val){ state.contracts[ci].review.text = val; }
+window.updateReviewText = updateReviewText;
+function submitReview(ci){
+  const c = state.contracts[ci], r = c.review;
+  if(r.stars===0){ r.error = "Kies eerst een aantal sterren."; render(); return; }
+  if(r.stars<=MANDATORY_MOTIVATION_THRESHOLD && !r.text.trim()){ r.error = `Bij ${r.stars} ster(ren) of lager is een schriftelijke toelichting verplicht.`; render(); return; }
+  r.error = "";
+  r.submitted = true;
+  state.reviews.unshift({ stars:r.stars, text:r.text.trim(), contractTitle:c.title });
+  render();
+  showToast("Beoordeling geplaatst — reputatiescore wordt automatisch herberekend. Geen beoordelingscommissie beoordeelt dit vooraf.");
+}
+window.submitReview = submitReview;
+
+function renderReviewWidget(c, ci){
+  const r = c.review;
+  if(!r) return "";
+  if(r.submitted){
+    return `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <div class="field-label" style="margin-top:0;">Jouw beoordeling van de wederpartij</div>
+      <div style="font-size:15px;color:var(--orange);">${'★'.repeat(r.stars)}<span style="color:var(--border);">${'★'.repeat(5-r.stars)}</span></div>
+      ${r.text ? `<p style="font-size:12.5px;margin:6px 0 0;color:var(--slate);">${r.text}</p>` : ""}
+    </div>`;
+  }
+  const mandatory = r.stars>0 && r.stars<=MANDATORY_MOTIVATION_THRESHOLD;
+  return `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+    <div class="field-label" style="margin-top:0;">Beoordeling geven aan de wederpartij</div>
+    <div style="font-size:24px;line-height:1;">
+      ${[1,2,3,4,5].map(n=>`<span onclick="setReviewStars(${ci},${n})" style="cursor:pointer;color:${n<=r.stars?'var(--orange)':'var(--border)'};">★</span>`).join("")}
+    </div>
+    ${r.stars>0 ? `
+    <label class="field-label">Waarom geef je deze beoordeling? ${mandatory?'(verplicht bij '+MANDATORY_MOTIVATION_THRESHOLD+' sterren of lager)':'(optioneel)'}</label>
+    <textarea id="reviewText-${ci}" class="field-input" rows="2" oninput="updateReviewText(${ci},this.value)">${(r.text||"").replace(/</g,"&lt;")}</textarea>
+    <button class="btn btn-sm" style="margin-top:8px;" onclick="submitReview(${ci})">Beoordeling plaatsen</button>` : `<p style="font-size:11.5px;color:var(--slate);margin-top:6px;">Kies een aantal sterren om te beoordelen — dit kan pas ná afronding van het contract.</p>`}
+    ${r.error ? `<div class="field-error">${r.error}</div>` : ""}
+  </div>`;
+}
+
+/* ---------- Community Bank — Leningaanvraag (4-staps flow) ---------- */
+const LOAN_STAGES = ["aanvraag","onderbouwing","stemmen","uitkomst"];
+const LOAN_STAGE_LABELS = {aanvraag:"Aanvraag", onderbouwing:"Onderbouwing", stemmen:"Steekproef & stemmen", uitkomst:"Uitkomst"};
+const LOAN_CATEGORIES = ["Uitrusting","Voorraad","Transport","Software"]; // Configuration Registry §5 — nooit leefkosten
+const LOAN_APPROVAL_THRESHOLD = 60; // Configuration Registry §1 — community_loan_approval_threshold
+
+function openLoanApplication(){
+  state.loanApplication = { stage:"aanvraag", purpose:"", amount:"", category:"Uitrusting", motivation:"", votes:0, votesFor:0, required:100, audience:300, simRounds:0 };
+  state.view = "loanApplication";
+  render();
+}
+window.openLoanApplication = openLoanApplication;
+
+function loanCanAdvance(){
+  const a = state.loanApplication;
+  if(a.stage==="aanvraag") return a.purpose.trim().length>0 && Number(a.amount)>0;
+  if(a.stage==="onderbouwing") return a.motivation.trim().length>0;
+  if(a.stage==="stemmen") return a.simRounds>0;
+  return true;
+}
+function loanBlockedReason(){
+  const a = state.loanApplication;
+  if(a.stage==="aanvraag") return "Vul een doel en een bedrag in.";
+  if(a.stage==="onderbouwing") return "Beschrijf eerst de onderbouwing.";
+  if(a.stage==="stemmen") return "Simuleer eerst minimaal één ronde stemmen.";
+  return "";
+}
+function loanNextStage(){
+  if(!loanCanAdvance()){ alert(loanBlockedReason()); return; }
+  const i = LOAN_STAGES.indexOf(state.loanApplication.stage);
+  if(i < LOAN_STAGES.length-1){ state.loanApplication.stage = LOAN_STAGES[i+1]; render(); }
+}
+window.loanNextStage = loanNextStage;
+function loanPrevStage(){
+  const i = LOAN_STAGES.indexOf(state.loanApplication.stage);
+  if(i > 0){ state.loanApplication.stage = LOAN_STAGES[i-1]; render(); }
+}
+window.loanPrevStage = loanPrevStage;
+
+function updateLoanField(field, val){ state.loanApplication[field] = val; }
+window.updateLoanField = updateLoanField;
+
+function simulateLoanVoting(){
+  const a = state.loanApplication;
+  if(a.votes >= a.required) return; // al genoeg stemmen, simulatie heeft geen effect meer
+  a.votes = Math.min(a.required, a.votes + 40); // cap op required (benodigde stemmen), niet audience (steekproefgrootte)
+  a.votesFor = 72; // illustratieve, deterministische uitkomst — geen echte steekproefberekening nodig voor dit showmodel
+  a.simRounds += 1;
+  render();
+  const justResolved = a.votes >= a.required;
+  showToast(justResolved
+    ? `Benodigde ${a.required} stemmen bereikt (uit steekproef van ${a.audience}) — resterende uitnodigingen komen te vervallen. ${a.votesFor}% vóór.`
+    : `Simuleer stemmen binnenkomen: ${a.votes}/${a.required} stemmen opgehaald uit de steekproef van ${a.audience} leden, ${a.votesFor}% vóór.`
+  );
+}
+window.simulateLoanVoting = simulateLoanVoting;
+
+function finalizeLoanApplication(){
+  const a = state.loanApplication;
+  const approved = a.votes>=a.required && a.votesFor>=LOAN_APPROVAL_THRESHOLD;
+  if(approved && !a.finalized){
+    state.loans.push({ purpose:a.purpose, amount:`€${Number(a.amount).toLocaleString('nl-NL')}`, votesFor:a.votesFor, required:a.required, votes:a.votes, audience:a.audience });
+    a.finalized = true;
+  }
+  return approved;
+}
+
+function viewLoanApplication(){
+  const a = state.loanApplication;
+  const idx = LOAN_STAGES.indexOf(a.stage);
+  let body = "";
+
+  if(a.stage==="aanvraag"){
+    body = `
+      <label class="field-label">Doel van de lening</label>
+      <input id="loan-purpose" class="field-input" value="${a.purpose.replace(/"/g,'&quot;')}" oninput="updateLoanField('purpose', this.value)" placeholder="Bijv. aanschaf compressor">
+      <label class="field-label">Bedrag</label>
+      <input id="loan-amount" class="field-input" style="max-width:180px;" type="text" inputmode="numeric" pattern="[0-9]*" value="${a.amount}" oninput="updateLoanField('amount', this.value)">
+      <label class="field-label">Categorie</label>
+      <select id="loan-category" class="field-input" onchange="updateLoanField('category', this.value)">
+        ${LOAN_CATEGORIES.map(c=>`<option ${a.category===c?'selected':''}>${c}</option>`).join("")}
+      </select>
+      <p style="font-size:11px;color:var(--slate-light);margin:6px 0 0;">Alleen deze vier categorieën zijn toegestaan — nooit leefkosten.</p>`;
+  }
+  else if(a.stage==="onderbouwing"){
+    body = `
+      <label class="field-label">Onderbouwing — waarom is dit nodig en hoe draagt het bij aan je terugbetaalcapaciteit?</label>
+      <textarea id="loan-motivation" class="field-input" rows="4" oninput="updateLoanField('motivation', this.value)">${(a.motivation||"").replace(/</g,"&lt;")}</textarea>`;
+  }
+  else if(a.stage==="stemmen"){
+    const pct = Math.min(100, Math.round((a.votes/a.required)*100));
+    const resolved = a.votes >= a.required;
+    body = `
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Stemmen opgehaald</span><span class="val">${a.votes}/${a.required} · ${a.votesFor}% vóór</span></div>
+      <div class="thinbar"><div style="width:${pct}%;background:var(--teal)"></div></div></div>
+      <p style="font-size:11.5px;color:var(--slate);margin:10px 0 14px;">Verstuurd naar een steekproef van ${a.audience} leden. Goedkeuring vereist minimaal ${a.required} uitgebrachte stemmen én ${LOAN_APPROVAL_THRESHOLD}% vóór.</p>
+      ${resolved
+        ? `<div class="fee-note">✓ Benodigde ${a.required} stemmen bereikt — resterende uitnodigingen uit de steekproef van ${a.audience} zijn komen te vervallen, de stemming is resolved.</div>`
+        : `<button class="btn btn-sm" onclick="simulateLoanVoting()">Simuleer stemmen binnenkomen</button>`}`;
+  }
+  else if(a.stage==="uitkomst"){
+    const approved = finalizeLoanApplication();
+    body = approved
+      ? `<div class="empty-module" style="padding:30px 20px;"><span class="tag" style="background:var(--success-tint);color:var(--success);">✓ Goedgekeurd</span><h2>Lening uitgekeerd (gesimuleerd)</h2><p>${a.votes}/${a.required} stemmen, ${a.votesFor}% vóór — boven de vereiste ${LOAN_APPROVAL_THRESHOLD}%. De aanvraag is toegevoegd aan de leningenlijst in Community Bank.</p></div>`
+      : `<div class="empty-module" style="padding:30px 20px;"><span class="tag" style="background:var(--danger-tint);color:var(--danger);">✗ Afgewezen</span><h2>Onvoldoende steun</h2><p>${a.votes}/${a.required} stemmen, ${a.votesFor}% vóór — niet voldoende voor de vereiste ${LOAN_APPROVAL_THRESHOLD}%.</p></div>`;
+  }
+
+  return `
+  <div class="card" style="margin-bottom:16px;max-width:640px;">
+    <div class="stage-tracker">
+      ${LOAN_STAGES.map((s,i)=>`${i>0?'<div class="stage-connector"></div>':''}<div class="stage"><div class="node ${i<idx?'done':''} ${i===idx?'current':''}">${LOAN_STAGE_LABELS[s]}</div></div>`).join("")}
+    </div>
+  </div>
+  <div class="card" style="max-width:640px;">
+    <div class="card-head"><div class="card-title"><span class="ic">✦</span>${LOAN_STAGE_LABELS[a.stage]}</div></div>
+    ${body}
+    ${a.stage!=="uitkomst" ? `
+    <div style="display:flex;justify-content:space-between;margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn ghost btn-sm" onclick="loanPrevStage()" ${idx===0?'disabled':''}>← Vorige</button>
+      <button class="btn btn-sm" onclick="loanNextStage()">Volgende →</button>
+    </div>` : `
+    <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn ghost btn-sm" onclick="state.view='communitybank';render();">← Terug naar Community Bank</button>
+    </div>`}
+  </div>`;
+}
+
+/* ---------- Flow A: AVI-onboarding (gesimuleerd) ---------- */
+const AVI_STAGES = ["intro","chip","bio","digid","result"];
+const AVI_STAGE_LABELS = {intro:"Introductie", chip:"Paspoortchip", bio:"Biometrie", digid:"DigiD", result:"Wallet"};
+
+function openAviFlow(){
+  state.avi = { stage:"intro", chipScanning:false, chipDone:false, bioScanning:false, bioDone:false, digidScanning:false, digidDone:false };
+  state.view = "avi";
+  render();
+}
+window.openAviFlow = openAviFlow;
+
+function aviCanAdvance(){
+  const a = state.avi;
+  if(a.stage==="chip") return a.chipDone;
+  if(a.stage==="bio") return a.bioDone;
+  if(a.stage==="digid") return a.digidDone;
+  return true;
+}
+function aviNextStage(){
+  if(!aviCanAdvance()) return;
+  const i = AVI_STAGES.indexOf(state.avi.stage);
+  if(i < AVI_STAGES.length-1){ state.avi.stage = AVI_STAGES[i+1]; render(); }
+}
+window.aviNextStage = aviNextStage;
+function aviPrevStage(){
+  const i = AVI_STAGES.indexOf(state.avi.stage);
+  if(i > 0){ state.avi.stage = AVI_STAGES[i-1]; render(); }
+}
+window.aviPrevStage = aviPrevStage;
+
+function simulateAviChip(){
+  state.avi.chipScanning = true; render();
+  setTimeout(()=>{ state.avi.chipScanning=false; state.avi.chipDone=true; render(); }, 1300);
+}
+window.simulateAviChip = simulateAviChip;
+function simulateAviBio(){
+  state.avi.bioScanning = true; render();
+  setTimeout(()=>{ state.avi.bioScanning=false; state.avi.bioDone=true; render(); }, 1300);
+}
+window.simulateAviBio = simulateAviBio;
+function simulateAviDigid(){
+  state.avi.digidScanning = true; render();
+  showToast("Doorverwijzing naar DigiD… (gesimuleerd, geen echte redirect)");
+  setTimeout(()=>{ state.avi.digidScanning=false; state.avi.digidDone=true; render(); }, 1300);
+}
+window.simulateAviDigid = simulateAviDigid;
+
+function viewAVI(){
+  const a = state.avi;
+  const idx = AVI_STAGES.indexOf(a.stage);
+  let body = "";
+
+  if(a.stage==="intro"){
+    body = `
+      <p style="font-size:16px;font-weight:800;font-style:italic;color:var(--teal-dark);margin:0 0 14px;">"Prove only what is necessary. Reveal nothing that is not."</p>
+      <p style="font-size:13px;color:var(--slate);line-height:1.6;margin:0 0 18px;">AVI is een decentrale identiteitslaag waarmee je alleen het gevraagde kenmerk bewijst — bijvoorbeeld "ouder dan 18? ja/nee" — zonder de onderliggende gegevens zoals naam, geboortedatum of adres te delen. De data verlaat nooit je eigen apparaat: een dienst ontvangt uitsluitend een cryptografisch bewijs, geen persoonsgegevens. AVI vervangt DigiD niet, maar werkt ernaast als persoonsgerichte, privacy-behoudende laag.</p>
+      <button class="btn" onclick="aviNextStage()">Start verificatie →</button>`;
+  }
+  else if(a.stage==="chip"){
+    body = `
+      <div class="card-title" style="font-size:13px;margin-bottom:8px;">Stap 1 — Paspoortchip uitlezen (offline)</div>
+      <p style="font-size:12.5px;color:var(--slate);margin:0 0 16px;">Dit gebeurt volledig offline op je apparaat — er is nog geen netwerkverbinding actief.</p>
+      ${a.chipDone ? `<span class="pill completed">✓ Chip uitgelezen</span>` : a.chipScanning ? `<div class="fee-note">⏳ Scannen…</div>` : `<button class="btn btn-sm" onclick="simulateAviChip()">Simuleer chip-uitlezen</button>`}`;
+  }
+  else if(a.stage==="bio"){
+    body = `
+      <div class="card-title" style="font-size:13px;margin-bottom:8px;">Stap 2 — Biometrische koppeling (on-device)</div>
+      <p style="font-size:12.5px;color:var(--slate);margin:0 0 16px;">Dit gebeurt op je apparaat, vóór er een online verbinding wordt gemaakt.</p>
+      ${a.bioDone ? `<span class="pill completed">✓ Biometrie gekoppeld</span>` : a.bioScanning ? `<div class="fee-note">⏳ Verifiëren…</div>` : `<button class="btn btn-sm" onclick="simulateAviBio()">Simuleer biometrische verificatie</button>`}`;
+  }
+  else if(a.stage==="digid"){
+    body = `
+      <div class="card-title" style="font-size:13px;margin-bottom:8px;">Stap 3 — DigiD-validatie (online)</div>
+      <p style="font-size:12.5px;color:var(--slate);margin:0 0 16px;">Dit koppelt de paspoortchip-certificaat aan de geregistreerde identiteit.</p>
+      ${a.digidDone ? `<span class="pill completed">✓ Gevalideerd via DigiD</span>` : a.digidScanning ? `<div class="fee-note">⏳ Doorverwijzing naar DigiD…</div>` : `<button class="btn btn-sm" onclick="simulateAviDigid()">Simuleer DigiD-validatie</button>`}`;
+  }
+  else if(a.stage==="result"){
+    const segments = [
+      { label:"Overheidsdiensten", active:true },
+      { label:"Commerciële identiteit", active:true },
+      { label:"Persoonlijke kluis", active:true },
+      { label:"Stemrecht", active:false }
+    ];
+    body = `
+      <div style="text-align:center;padding:10px 10px 20px;"><span class="pill completed" style="font-size:12px;padding:6px 14px;">✓ Wallet aangemaakt</span></div>
+      <div class="grid grid-4" style="margin-bottom:16px;">
+        ${segments.map(s=>`<div class="mini-stat ${s.active?'c-teal':'c-slate'}" style="text-align:center;${s.active?'':'opacity:.55;'}"><div class="m-lbl">${s.label}</div><div class="m-val" style="font-size:13px;">${s.active?'Actief':'Inactief'}</div></div>`).join("")}
+      </div>
+      <p style="font-size:11.5px;color:var(--slate-light);margin:0;">Elke 6 maanden opnieuw te bevestigen via hetzelfde drietraps-proces.</p>`;
+  }
+
+  return `
+  <div style="background:var(--orange-tint);color:#A8590C;font-size:11.5px;font-weight:700;padding:10px 16px;border-radius:10px;margin-bottom:16px;max-width:640px;line-height:1.5;">● AVI-integratie: gebouwd op dezelfde Identus-kern als MVP1's identiteitslaag, hier getoond als uitgebreide toekomstversie — exacte implementatie nog te bepalen.</div>
+  <div class="card" style="margin-bottom:16px;max-width:640px;">
+    <div class="stage-tracker">
+      ${AVI_STAGES.map((s,i)=>`${i>0?'<div class="stage-connector"></div>':''}<div class="stage"><div class="node ${i<idx?'done':''} ${i===idx?'current':''}">${AVI_STAGE_LABELS[s]}</div></div>`).join("")}
+    </div>
+  </div>
+  <div class="card" style="max-width:640px;">
+    ${body}
+    ${a.stage!=="intro" && a.stage!=="result" ? `
+    <div style="display:flex;justify-content:space-between;margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn ghost btn-sm" onclick="aviPrevStage()">← Vorige</button>
+      <button class="btn btn-sm" onclick="aviNextStage()" ${aviCanAdvance()?'':'disabled'}>Volgende →</button>
+    </div>` : ""}
+    ${a.stage==="result" ? `
+    <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn ghost btn-sm" onclick="state.view='profile';render();">← Terug naar Profiel</button>
+    </div>` : ""}
+  </div>`;
+}
+
+/* ---------- Flow B: Payment/Bank Coupling ---------- */
+function openBankCoupling(){ state.view = "bankCoupling"; render(); }
+window.openBankCoupling = openBankCoupling;
+
+function linkBank(){
+  showToast("Doorverwijzing naar betaalprovider… (gesimuleerd, geen echte provider-integratie)");
+  state.bankCoupling.status = "pending";
+  render();
+}
+window.linkBank = linkBank;
+function confirmBankProvider(){
+  state.bankCoupling.status = "linked";
+  render();
+  showToast("Bankkoppeling geverifieerd — referentietoken opgeslagen, geen rekeninggegevens.");
+}
+window.confirmBankProvider = confirmBankProvider;
+
+function viewBankCoupling(){
+  const s = state.bankCoupling.status;
+  const statusPill = s==="linked" ? `<span class="pill completed">Gekoppeld</span>` : s==="pending" ? `<span class="pill pending">Verificatie in behandeling</span>` : `<span class="pill dormant">Niet gekoppeld</span>`;
+  return `
+  <div class="card" style="max-width:640px;">
+    <div class="card-head"><div class="card-title"><span class="ic">◈</span>Bankkoppeling</div>${statusPill}</div>
+    <p style="font-size:12.5px;color:var(--slate);line-height:1.6;margin:0 0 16px;">GoodCompany slaat nooit je rekeningnummer of bankgegevens rechtstreeks op — alleen een referentietoken via een gelicentieerde betaalprovider.</p>
+    ${s==="not_linked" ? `<button class="btn btn-sm" onclick="linkBank()">Bank koppelen</button>` : ""}
+    ${s==="pending" ? `<div class="fee-note" style="margin-bottom:10px;">⏳ Doorverwijzing naar betaalprovider afgerond — wacht op bevestiging vóór gebruik.</div><button class="btn btn-sm" onclick="confirmBankProvider()">Simuleer providerbevestiging</button>` : ""}
+    ${s==="linked" ? `<div class="ov-row"><div class="ov-top"><span class="lbl">Referentietoken</span><span class="val">●●●●-7F2A</span></div></div><p style="font-size:11px;color:var(--slate-light);margin:6px 0 0;">Geverifieerd vóór gebruik — geen rekeninggegevens bij GoodCompany opgeslagen.</p>` : ""}
+  </div>
+  <p style="font-size:11px;color:var(--slate-light);margin:14px 0 0;max-width:640px;">Elke actie die geld verplaatst (bijv. een mijlpaal goedkeuren in Escrow & Mijlpalen) vereist bovendien directe herauthenticatie, ook binnen een actieve sessie — en wordt asynchroon bevestigd, nooit alleen synchroon.</p>
+  <button class="btn ghost btn-sm" style="margin-top:16px;" onclick="state.view='profile';render();">← Terug naar Profiel</button>`;
+}
+
+function renderSidebar(){
+  const el = document.getElementById("sidebar");
+  const groups = [{key:"main", label:"Modules"}, {key:"soon", label:"Later beschikbaar"}];
+  el.innerHTML = `
+    <div class="brand"><div class="mark">GC</div><div class="txt"><span>GoodCompany</span><small>MVP 1 showmodel</small></div></div>
+    ${groups.map(g => `
+      <div class="navgroup-title">${g.label}</div>
+      ${nav.filter(n=>n.group===g.key).map(n => `
+        <button class="navitem ${state.view===n.id?'active':''} ${n.soon?'disabled':''}" data-view="${n.id}">
+          <span class="ic">${n.icon}</span>${n.label}
+          ${n.soon?'<span class="soon-tag">SOON</span>':''}
+        </button>`).join("")}
+    `).join("")}
+  `;
+  Array.prototype.forEach.call(el.querySelectorAll(".navitem"), function(btn){
+    btn.addEventListener("click", ()=>{ state.view = btn.dataset.view; render(); });
+  });
+}
+
+/* ---------- Reusable pieces ---------- */
+function donut(segments, size=126){
+  // segments: [{value, color}]
+  const total = segments.reduce((a,s)=>a+s.value,0);
+  let acc = 0;
+  const stops = segments.map(s=>{
+    const start = (acc/total)*360; acc += s.value; const end = (acc/total)*360;
+    return `${s.color} ${start}deg ${end}deg`;
+  }).join(", ");
+  return `<div class="donut" style="width:${size}px;height:${size}px;background:conic-gradient(${stops});"></div>`;
+}
+function legendFor(segments){
+  return `<div class="legend">${segments.map(s=>`
+    <div class="legend-item"><span class="legend-dot" style="background:${s.color}"></span>${s.label} <span style="color:var(--slate-light);font-weight:500;">${s.value}%</span></div>
+  `).join("")}</div>`;
+}
+function kpi(icColor, icon, label, frac, pct, barColor){
+  return `
+  <div class="card kpi">
+    <div class="kpi-top">
+      <div class="lbl"><span class="ic" style="background:${icColor}">${icon}</span>${label}</div>
+      <span class="kpi-frac">${frac}</span>
+    </div>
+    <div class="thinbar"><div style="width:${pct}%;background:${barColor}"></div></div>
+  </div>`;
+}
+
+function viewDashboard(){
+  return `
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpi("var(--teal)","⇄","Onderhandelingen","2 / 3",66,"var(--teal)")}
+    ${kpi("var(--orange)","◈","Actieve contracten","1 / 2",50,"var(--orange)")}
+    ${kpi("var(--info)","◔","Escrow gefund (per contract)","€4.200",78,"var(--info)")}
+    ${kpi("var(--success)","●","Werkkapitaal in eigen escrow","€1.850",37,"var(--success)")}
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-head"><div class="card-title"><span class="drag">⠿⠿</span>Job overzicht</div><a class="card-link" href="#" onclick="return false;">Alles →</a></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Open</span><span class="val">1 · 33%</span></div><div class="thinbar"><div style="width:33%;background:var(--success)"></div></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Dormant</span><span class="val">1 · 33%</span></div><div class="thinbar"><div style="width:33%;background:var(--slate-light)"></div></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Closed</span><span class="val">1 · 33%</span></div><div class="thinbar"><div style="width:33%;background:var(--border)"></div></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Reacties totaal</span><span class="val">9</span></div><div class="thinbar"><div style="width:70%;background:var(--teal)"></div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title"><span class="ic">◈</span>Contracten naar status</div></div>
+      <div class="donut-wrap">
+        ${donut([{value:50,color:"var(--teal)"},{value:50,color:"var(--success)"}])}
+        ${legendFor([{label:"Actief",value:50,color:"var(--teal)"},{label:"Voltooid",value:50,color:"var(--success)"}])}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-3" style="margin-bottom:16px;">
+    <div class="mini-stat c-orange"><div class="m-lbl">Openstaand (contract-escrow)</div><div class="m-val">€4.200</div></div>
+    <div class="mini-stat c-slate"><div class="m-lbl">Payout in behandeling</div><div class="m-val">€0</div></div>
+    <div class="mini-stat c-teal">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div class="m-lbl">Uitbetaald totaal</div>
+        <select class="filter-select" style="font-size:10px;padding:3px 6px;"><option>Dit jaar</option><option>Lifetime</option><option>Vorig jaar</option></select>
+      </div>
+      <div class="m-val">€9.800</div>
+    </div>
+  </div>
+  <p style="font-size:11px;color:var(--slate-light);margin:-8px 0 16px;">Werkkapitaal = je persoonlijke escrow-buffer (nog niet uitbetaald naar je bank). Contract-escrow is apart per lopende opdracht, tussen jou en de opdrachtgever.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title"><span class="drag">⠿⠿</span>Community Bank reserves</div><a class="card-link" href="#" onclick="return false;">Community Bank →</a></div>
+    ${state.reserves.map(r=>`
+      <div class="ov-row"><div class="ov-top"><span class="lbl">${r.name}${r.threshold?` <span style="color:var(--slate-light);font-weight:500;">(min. ${r.threshold}%)</span>`:""}</span><span class="val">${r.pct}% · ${fmtEUR(state.communityBankTotal*r.pct/100)}</span></div>
+      <div class="thinbar"><div style="width:${r.pct}%;background:${r.threshold && r.pct<r.threshold ? "var(--orange)" : r.color}"></div></div></div>`).join("")}
+  </div>`;
+}
+
+function viewMarketplace(){
+  return `
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="card-title" style="font-size:13px;"><span class="ic">▤</span>Openstaande en lopende jobs</div>
+    <button class="btn btn-sm" onclick="openJobModal()">+ Job posten</button>
+  </div>
+  <div class="card dtable" style="padding:0;overflow:hidden;">
+    ${state.jobs.map(j=>`
+      <div class="drow sev-${j.status}" ${j.status==='open' ? `style="cursor:pointer;" onclick="state.view='workspace';render();"` : ''}>
+        <div class="dr-main"><div class="dr-title">${j.title}</div><div class="dr-sub">${j.region} · ${j.responses} reacties${j.status==='open'?' · klik voor Negotiation Workspace':''}</div></div>
+        <div class="dr-right">
+          <span class="priority ${j.priority}">${j.priority==='high'?'Hoog':j.priority==='medium'?'Middel':'Laag'}</span>
+          <span class="pill ${j.status}">${j.status}</span>
+        </div>
+      </div>`).join("")}
+  </div>
+  <p style="color:var(--slate);font-size:11.5px;margin-top:12px;">"Alleen binnen mijn expertise" staat standaard aan — hier gesimuleerd, geen echte filter. Indicatief budget is nooit publiek zichtbaar op de listing — dat wordt pas onderdeel van het gesprek in de Negotiation Workspace.</p>`;
+}
+
+function viewContacts(){
+  return `<div class="grid grid-2b">` + Object.entries(state.contacts).map(([group, list])=>`
+    <div class="contact-group card">
+      <h3>${group}</h3>
+      ${list.map((c,i)=>{
+        const key = group+"|"+i;
+        const isOpen = state.expandedContact === key;
+        return `
+        <div>
+          <div class="contact-item" style="cursor:pointer;" onclick="toggleContactDetail('${group}', ${i})">
+            <span class="dot-status ${c.linked?'linked':'unlinked'}"></span>
+            <span style="flex:1;font-weight:600;font-size:13px;">${c.name}</span>
+            ${c.linked ? `<span class="pill linked">Actief op GC</span>` : `<span class="pill unlinked">Nog geen account</span>`}
+          </div>
+          ${isOpen ? `
+          <div style="padding:10px 0 14px 21px;font-size:12px;color:var(--slate);">
+            <div>📞 ${c.phone || "—"}</div>
+            <div>✉️ ${c.email || "—"}</div>
+            <div style="margin-top:8px;display:flex;gap:8px;">
+              ${c.linked ? `<button class="btn ghost btn-sm" onclick="event.stopPropagation();alert('(gesimuleerd) opent publiek profiel van ${c.name.replace(/'/g,"")}');">Bekijk profiel →</button>` : `<button class="btn ghost btn-sm" onclick="event.stopPropagation();inviteContact('${group}', ${i})">Uitnodigen →</button>`}
+            </div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+              <div class="field-label" style="margin-top:0;">Persoonlijke voorkeur (alleen zichtbaar voor jou)</div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn ${c.collaborationPreference==='prefer'?'':'ghost'} btn-sm" onclick="event.stopPropagation();setCollaborationPreference('${group}', ${i}, 'prefer')">Prefer</button>
+                <button class="btn ${c.collaborationPreference==='avoid'?'':'ghost'} btn-sm" onclick="event.stopPropagation();setCollaborationPreference('${group}', ${i}, 'avoid')">Avoid</button>
+              </div>
+              ${c.collaborationPreference==='avoid' ? `<p style="font-size:10.5px;color:var(--slate-light);margin:8px 0 0;">Alleen zichtbaar voor jou. Beïnvloedt geen reputatie en stuurt geen melding.</p>` : ""}
+            </div>
+          </div>` : ""}
+        </div>`;
+      }).join("")}
+    </div>`).join("") + `</div><button class="btn ghost" style="margin-top:14px;" onclick="openContactModal()">+ Contact toevoegen</button>
+    <button class="btn ghost" style="margin-top:14px;margin-left:8px;" onclick="openGroupModal()">+ Nieuwe groep</button>
+    <p style="font-size:11px;color:var(--slate-light);margin-top:10px;">Groepen zijn volledig zelf te benoemen (bijv. "Leveranciers bouwmaterialen" naast "Leveranciers chemie") — geen vaste categorieën.</p>`;
+}
+function toggleContactDetail(group, i){
+  const key = group+"|"+i;
+  state.expandedContact = (state.expandedContact === key) ? null : key;
+  render();
+}
+window.toggleContactDetail = toggleContactDetail;
+function setCollaborationPreference(group, i, pref){
+  const c = state.contacts[group][i];
+  c.collaborationPreference = (c.collaborationPreference === pref) ? null : pref;
+  render();
+}
+window.setCollaborationPreference = setCollaborationPreference;
+function inviteContact(group, i){
+  const c = state.contacts[group][i];
+  c.invited = true;
+  render();
+  const channelNote = c.email ? `naar ${c.email}` : c.phone ? `naar ${c.phone}` : "(geen contactgegevens bekend — vul die eerst aan)";
+  showToast(`Uitnodiging (gesimuleerd) verstuurd aan ${c.name} ${channelNote}: "GoodCompany is de plek waar je je werktraject veilig en eerlijk voltooit — zonder zorgen. Ook de plek waar je je volgende klus vindt."`);
+}
+window.inviteContact = inviteContact;
+
+function showToast(message){
+  let el = document.getElementById("gcToast");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "gcToast";
+    el.className = "gc-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>{ el.classList.remove("show"); }, 5000);
+}
+window.showToast = showToast;
+function openContactModal(){
+  const sel = document.getElementById("cm-group");
+  sel.innerHTML = Object.keys(state.contacts).map(g=>`<option>${g}</option>`).join("");
+  document.getElementById("contactModalOverlay").style.display = "flex";
+}
+function closeContactModal(){ document.getElementById("contactModalOverlay").style.display = "none"; }
+function submitContactModal(){
+  const name = document.getElementById("cm-name").value.trim();
+  if(!name){ alert("Vul minimaal een naam in."); return; }
+  const phone = document.getElementById("cm-phone").value.trim();
+  const email = document.getElementById("cm-email").value.trim();
+  const group = document.getElementById("cm-group").value;
+  const channel = document.getElementById("cm-channel").value;
+  state.contacts[group].push({ name, phone, email, channel, linked:false });
+  closeContactModal();
+  render();
+}
+window.openContactModal = openContactModal;
+window.closeContactModal = closeContactModal;
+window.submitContactModal = submitContactModal;
+
+function openGroupModal(){ document.getElementById("groupModalOverlay").style.display = "flex"; }
+function closeGroupModal(){ document.getElementById("groupModalOverlay").style.display = "none"; }
+function submitGroupModal(){
+  const name = document.getElementById("gm-name").value.trim();
+  if(!name) return;
+  state.contacts[name] = [];
+  closeGroupModal();
+  render();
+}
+window.openGroupModal = openGroupModal;
+window.closeGroupModal = closeGroupModal;
+window.submitGroupModal = submitGroupModal;
+
+function viewGoodTrade(){
+  const stages = ["introduction","technical_intake","terms","quote","contract_preview","closed"];
+  const labels = {introduction:"Introductie", technical_intake:"Technische intake", terms:"Voorwaarden", quote:"Offerte", contract_preview:"Contract preview", closed:"Afgerond"};
+  const currentIdx = stages.indexOf(state.workspaceStage);
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><div class="card-title"><span class="ic">⇄</span>Negotiation Workspace — Website herbouwen (Studio Vellema)</div></div>
+    <div class="stage-tracker">
+      ${stages.map((s,i)=>`${i>0?'<div class="stage-connector"></div>':''}<div class="stage"><div class="node ${i<currentIdx?'done':''} ${i===currentIdx?'current':''}">${labels[s]}</div></div>`).join("")}
+    </div>
+    <p style="font-size:12.5px;color:var(--slate);margin:12px 0;">Huidige fase: <strong style="color:var(--ink);">${labels[state.workspaceStage]}</strong></p>
+    <button class="btn" onclick="state.view='workspace';render();">Workspace openen →</button>
+  </div>
+  <div class="grid grid-2">
+    <div class="card dtable" style="padding:0;overflow:hidden;">
+      <div style="padding:16px 16px 4px;"><div class="card-title" style="font-size:13px;">Actieve contracten</div></div>
+      ${state.contracts.filter(c=>c.status!=="completed").map(c=>{
+        const i = state.contracts.indexOf(c);
+        return `
+        <div class="drow sev-${c.status}" style="cursor:pointer;" onclick="openContractDetail(${i})">
+          <div class="dr-main"><div class="dr-title">${c.title}</div><div class="dr-sub">${c.amount} · klik voor volledig traject</div></div>
+          <div class="dr-right"><span class="pill ${c.status}">${c.status}</span><span class="pill ${c.escrow}">${c.escrow}</span></div>
+        </div>`;
+      }).join("") || `<div style="padding:16px;color:var(--slate);font-size:12.5px;">Geen actieve contracten.</div>`}
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title"><span class="ic">◈</span>Escrow-verdeling</div></div>
+      <div class="donut-wrap">
+        ${donut([{value:78,color:"var(--teal)"},{value:22,color:"var(--border)"}], 108)}
+        ${legendFor([{label:"Gefund",value:78,color:"var(--teal)"},{label:"Nog te funden",value:22,color:"var(--border)"}])}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <button class="accordion-toggle" onclick="toggleCompleted()">
+      <span class="card-title" style="font-size:13px;"><span class="ic">✓</span>Voltooide projecten <span style="color:var(--slate);font-weight:600;">(${state.contracts.filter(c=>c.status==="completed").length})</span></span>
+      <span id="accIcon">${state.completedOpen? '▾':'▸'}</span>
+    </button>
+    <div id="completedPanel" style="${state.completedOpen? '':'display:none;'}margin-top:14px;">
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <select class="filter-select"><option>Alle jaren</option><option>2026</option><option>2025</option><option>2024</option></select>
+        <select class="filter-select"><option>Alle maanden</option><option>Januari</option><option>Februari</option><option>Maart</option></select>
+        <div class="searchbar" style="flex:1;min-width:160px;max-width:260px;"><span class="ic">⌕</span><span>Zoek op naam…</span></div>
+      </div>
+      <div class="dtable" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        ${state.contracts.filter(c=>c.status==="completed").map(c=>{
+          const i = state.contracts.indexOf(c);
+          return `
+          <div class="drow sev-completed" style="cursor:pointer;" onclick="openContractDetail(${i})">
+            <div class="dr-main"><div class="dr-title">${c.title}</div><div class="dr-sub">${c.amount} · klik voor volledig traject</div></div>
+            <div class="dr-right"><span class="pill completed">completed</span><span class="pill ${c.escrow}">${c.escrow}</span></div>
+          </div>`;
+        }).join("")}
+      </div>
+      <p style="font-size:11px;color:var(--slate-light);margin-top:10px;">Filters zijn hier nog decoratief — bij honderden voltooide projecten per jaar wordt dit een echte zoek-/filterquery.</p>
+    </div>
+  </div>`;
+}
+
+/* ---------- Workspace detail: real per-stage screens ---------- */
+const stageList = ["introduction","technical_intake","terms","quote","contract_preview","closed"];
+const stageLabels = {introduction:"Introductie", technical_intake:"Technische intake", terms:"Voorwaarden", quote:"Offerte", contract_preview:"Contract preview", closed:"Afgerond"};
+
+function activeIntakeQuestions(d){
+  return d.questionLibrary.filter(x=>x.selected).map(x=>x.q).concat(d.customQuestions);
+}
+function toggleLibraryQuestion(i){ state.wsDetail.questionLibrary[i].selected = !state.wsDetail.questionLibrary[i].selected; render(); }
+window.toggleLibraryQuestion = toggleLibraryQuestion;
+function updateCustomQuestionDraft(val){ state.wsDetail.customQuestionDraft = val; }
+window.updateCustomQuestionDraft = updateCustomQuestionDraft;
+function addCustomQuestion(){
+  const d = state.wsDetail;
+  const q = (d.customQuestionDraft||"").trim();
+  if(!q) return;
+  d.customQuestions.push(q);
+  d.customQuestionDraft = "";
+  render();
+}
+window.addCustomQuestion = addCustomQuestion;
+function removeCustomQuestion(i){ state.wsDetail.customQuestions.splice(i,1); render(); }
+window.removeCustomQuestion = removeCustomQuestion;
+function updateIntakeAnswer(q, val){ state.wsDetail.intakeAnswers[q] = val; }
+window.updateIntakeAnswer = updateIntakeAnswer;
+
+function canAdvance(){
+  const s = state.workspaceStage, d = state.wsDetail;
+  if(s==="technical_intake"){
+    const qs = activeIntakeQuestions(d);
+    return qs.length>0 && qs.every(q=>(d.intakeAnswers[q]||"").trim().length>0);
+  }
+  if(s==="terms"){
+    const sum = d.terms.phases.reduce((a,p)=>a+Number(p.pct||0),0);
+    return d.termsAccepted && sum===100;
+  }
+  if(s==="quote") return d.quoteSubmitted && d.quoteAccepted;
+  if(s==="contract_preview") return d.signatures.client && d.signatures.contractor;
+  return true;
+}
+function blockedReason(){
+  const s = state.workspaceStage, d = state.wsDetail;
+  if(s==="technical_intake"){
+    const qs = activeIntakeQuestions(d);
+    if(qs.length===0) return "Selecteer minimaal één vraag (of voeg een eigen vraag toe) vóórdat je verder kan.";
+    return "Beantwoord eerst alle geselecteerde intakevragen.";
+  }
+  if(s==="terms"){
+    const sum = d.terms.phases.reduce((a,p)=>a+Number(p.pct||0),0);
+    if(sum!==100) return `Betalingsfases moeten samen 100% zijn (nu ${sum}%).`;
+    if(!d.termsAccepted) return "Accepteer de voorwaarden eerst.";
+  }
+  if(s==="quote") return "Offerte moet ingediend én geaccepteerd zijn.";
+  if(s==="contract_preview") return "Beide partijen moeten ondertekenen.";
+  return "";
+}
+function nextStage(){
+  if(!canAdvance()){ alert(blockedReason()); return; }
+  const i = stageList.indexOf(state.workspaceStage);
+  if(i < stageList.length-1){ state.workspaceStage = stageList[i+1]; render(); }
+}
+function prevStage(){
+  const i = stageList.indexOf(state.workspaceStage);
+  if(i > 0){ state.workspaceStage = stageList[i-1]; render(); }
+}
+window.nextStage = nextStage; window.prevStage = prevStage;
+
+function sendMessage(){
+  const inp = document.getElementById("chatInput");
+  if(!inp || !inp.value.trim()) return;
+  state.wsDetail.messages.push({from:"contractor", text:inp.value.trim()});
+  render();
+  setTimeout(()=>{ document.getElementById("chatInput") && document.getElementById("chatInput").focus(); },0);
+}
+window.sendMessage = sendMessage;
+
+function updateTermsField(field, val){ state.wsDetail.terms[field] = val; }
+window.updateTermsField = updateTermsField;
+function updatePhase(i, field, val){ state.wsDetail.terms.phases[i][field] = field==="pct" ? Number(val) : val; render(); }
+window.updatePhase = updatePhase;
+function updatePhaseSelect(i, val){
+  state.wsDetail.terms.phases[i].desc = (val==="Aangepast label…") ? "" : val;
+  render();
+}
+window.updatePhaseSelect = updatePhaseSelect;
+function addPhase(){ state.wsDetail.terms.phases.push({pct:0, desc:"Bij oplevering"}); render(); }
+window.addPhase = addPhase;
+function removePhase(i){ state.wsDetail.terms.phases.splice(i,1); render(); }
+window.removePhase = removePhase;
+function acceptTerms(){ state.wsDetail.termsAccepted = true; render(); }
+window.acceptTerms = acceptTerms;
+
+function submitQuote(){ state.wsDetail.quoteSubmitted = true; render(); }
+window.submitQuote = submitQuote;
+function acceptQuote(){ state.wsDetail.quoteAccepted = true; render(); }
+window.acceptQuote = acceptQuote;
+
+function signAs(role){ state.wsDetail.signatures[role] = true; render(); }
+window.signAs = signAs;
+
+function viewWorkspaceDetail(){
+  const s = state.workspaceStage, d = state.wsDetail;
+  const idx = stageList.indexOf(s);
+  let body = "";
+
+  if(s==="introduction"){
+    body = `
+    <div class="chat-thread">
+      ${d.messages.map(m=>`<div class="chat-bubble ${m.from}"><div class="cb-role">${m.from==='client'?'Opdrachtgever':'Jij'}</div>${m.text}</div>`).join("")}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <input class="field-input" id="chatInput" placeholder="Typ een bericht…" onkeydown="if(event.key==='Enter'){sendMessage();}">
+      <button class="btn btn-sm" onclick="sendMessage()">Versturen</button>
+    </div>`;
+  }
+  else if(s==="technical_intake"){
+    const active = activeIntakeQuestions(d);
+    body = `
+      <div class="card-title" style="font-size:12.5px;margin-bottom:6px;">Vragen-picker</div>
+      <p style="font-size:11px;color:var(--slate-light);margin:0 0 10px;">Illustratieve standaardvragen voor een generieke categorie — de daadwerkelijke vragenbibliotheek per vakgebied bestaat nog niet, dit is placeholder-content.</p>
+      ${d.questionLibrary.map((item,i)=>`
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 0;cursor:pointer;">
+          <input type="checkbox" ${item.selected?'checked':''} onchange="toggleLibraryQuestion(${i})">
+          ${item.q}
+        </label>`).join("")}
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input id="customQInput" class="field-input" placeholder="Eigen vraag toevoegen…" value="${(d.customQuestionDraft||"").replace(/"/g,'&quot;')}" oninput="updateCustomQuestionDraft(this.value)" onkeydown="if(event.key==='Enter'){addCustomQuestion();}">
+        <button class="btn ghost btn-sm" onclick="addCustomQuestion()">+ Toevoegen</button>
+      </div>
+      ${d.customQuestions.length>0 ? `
+      <div style="margin-top:8px;">
+        ${d.customQuestions.map((q,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--slate);padding:3px 0;">
+          <span>+ ${q}</span><button class="btn ghost btn-sm" onclick="removeCustomQuestion(${i})">✕</button>
+        </div>`).join("")}
+      </div>` : ""}
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+        <div class="card-title" style="font-size:12.5px;margin-bottom:10px;">Beantwoord de geselecteerde vragen</div>
+        ${active.length===0 ? `<p style="font-size:12px;color:var(--slate);margin:0;">Nog geen vragen geselecteerd.</p>` : active.map((q,i)=>`
+          <div style="margin-bottom:14px;">
+            <label class="field-label">${q}</label>
+            <input id="intake-${i}" class="field-input" value="${(d.intakeAnswers[q]||"").replace(/"/g,'&quot;')}" oninput="updateIntakeAnswer('${q.replace(/'/g,"\\'")}', this.value)">
+          </div>`).join("")}
+      </div>
+
+      <div class="fee-note">🔒 Geen bedrag zichtbaar in deze fase — <strong>Terms before Money</strong>: een prijs komt pas ter sprake bij de Offerte-stage, ná het vastleggen van voorwaarden.</div>`;
+  }
+  else if(s==="terms"){
+    const sum = d.terms.phases.reduce((a,p)=>a+Number(p.pct||0),0);
+    body = `
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;"><label class="field-label">Werkuren</label><input id="workingHoursInput" class="field-input" value="${d.terms.workingHours}" oninput="updateTermsField('workingHours', this.value)" placeholder="Bijv. ma-vr, 9-17u"></div>
+        <div style="flex:1;"><label class="field-label">Communicatiekanaal</label><input id="commChannelInput" class="field-input" value="${d.terms.commChannel}" oninput="updateTermsField('commChannel', this.value)" placeholder="Bijv. GoodCompany chat"></div>
+      </div>
+      <label class="field-label">Garantietermijn — dagen ná oplevering waarin gebreken kosteloos hersteld worden</label>
+      <select id="warrantyInput" class="field-input" onchange="updateTermsField('warrantyPeriodDays', Number(this.value));render();">
+        ${[0,15,30,90].map(v=>`<option value="${v}" ${d.terms.warrantyPeriodDays===v?'selected':''}>${v===0?'Geen garantie (0 dagen)':v+' dagen'}</option>`).join("")}
+      </select>
+      <div class="fee-note">Gekoppelde holdback-reservering: ${d.terms.warrantyPeriodDays===0 ? '<strong>N.v.t.</strong> — geen garantie, geen reservering.' : `<strong>${WARRANTY_HOLDBACK_MAP[d.terms.warrantyPeriodDays]}%</strong> van het offertebedrag blijft na oplevering nog in escrow gedurende de garantieperiode (automatisch gekoppeld, niet los instelbaar).`}</div>
+      <label class="field-label" style="margin-top:14px;display:block;">Betalingsfases (moet samen 100% zijn — nu <strong style="color:${sum===100?'var(--success)':'var(--danger)'}">${sum}%</strong>)</label>
+      ${d.terms.phases.map((p,i)=>{
+        const presets = ["Bij start","Bij oplevering","Afronding fase 1","Afronding fase 2","Beschikbaarheid escrow voor inkoop bij derde","Aangepast label…"];
+        const isCustom = !presets.slice(0,-1).includes(p.desc);
+        return `
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+          <input id="phase-pct-${i}" class="field-input" style="width:70px;" type="text" inputmode="numeric" pattern="[0-9]*" value="${p.pct}" oninput="updatePhase(${i},'pct',this.value)">
+          <span style="font-size:12px;color:var(--slate);">%</span>
+          <select id="phase-select-${i}" class="filter-select" style="flex:1;min-width:180px;" onchange="updatePhaseSelect(${i}, this.value)">
+            ${presets.map(opt=>`<option ${(!isCustom && p.desc===opt) || (isCustom && opt==="Aangepast label…") ? 'selected':''}>${opt}</option>`).join("")}
+          </select>
+          ${isCustom ? `<input id="phase-desc-${i}" class="field-input" style="flex:1;min-width:160px;" value="${p.desc.replace(/"/g,'&quot;')}" oninput="updatePhase(${i},'desc',this.value)" placeholder="Eigen omschrijving…">` : ""}
+          <button class="btn ghost btn-sm" onclick="removePhase(${i})">✕</button>
+        </div>`;
+      }).join("")}
+      <button class="btn ghost btn-sm" onclick="addPhase()">+ Fase toevoegen</button>
+      <div style="margin-top:16px;">
+        ${d.termsAccepted
+          ? `<span class="pill completed">✓ Voorwaarden geaccepteerd</span>`
+          : `<button class="btn" onclick="acceptTerms()">Voorwaarden accepteren</button>`}
+      </div>`;
+  }
+  else if(s==="quote"){
+    body = `
+      <label class="field-label">Totaalbedrag</label>
+      <input id="quoteTotalInput" class="field-input" style="max-width:200px;${d.quoteSubmitted?'opacity:.65;cursor:default;':''}" type="text" inputmode="numeric" pattern="[0-9]*" value="${d.quoteTotal}" oninput="state.wsDetail.quoteTotal=Number(this.value);render();" ${d.quoteSubmitted?'readonly':''}>
+      <div style="margin-top:14px;">
+        <div class="card-title" style="font-size:12px;color:var(--slate);margin-bottom:8px;">Afgeleide fasebedragen (uit Voorwaarden)</div>
+        ${d.terms.phases.map(p=>`<div class="ov-row"><div class="ov-top"><span class="lbl">${p.desc} (${p.pct}%)</span><span class="val">€${Math.round(d.quoteTotal*p.pct/100).toLocaleString('nl-NL')}</span></div></div>`).join("")}
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;">
+        ${!d.quoteSubmitted ? `<button class="btn" onclick="submitQuote()">Offerte indienen (opdrachtnemer)</button>` : `<span class="pill funded">✓ Ingediend</span>`}
+        ${d.quoteSubmitted && !d.quoteAccepted ? `<button class="btn" onclick="acceptQuote()">Offerte accepteren (opdrachtgever)</button>` : ""}
+        ${d.quoteAccepted ? `<span class="pill completed">✓ Geaccepteerd</span>` : ""}
+      </div>`;
+  }
+  else if(s==="contract_preview"){
+    body = `
+      <div class="card" style="background:var(--bg);margin-bottom:16px;">
+        <div class="card-title" style="font-size:12.5px;margin-bottom:10px;">Samenvatting</div>
+        <div class="ov-row"><div class="ov-top"><span class="lbl">Totaalbedrag</span><span class="val">€${d.quoteTotal.toLocaleString('nl-NL')}</span></div></div>
+        <div class="ov-row"><div class="ov-top"><span class="lbl">Werkuren</span><span class="val">${d.terms.workingHours||"—"}</span></div></div>
+        <div class="ov-row"><div class="ov-top"><span class="lbl">Garantie</span><span class="val">${d.terms.warrantyPeriodDays===0?'Geen':d.terms.warrantyPeriodDays+' dagen ('+WARRANTY_HOLDBACK_MAP[d.terms.warrantyPeriodDays]+'% holdback)'}</span></div></div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        ${d.signatures.contractor ? `<span class="pill completed">✓ Opdrachtnemer getekend</span>` : `<button class="btn" onclick="signAs('contractor')">Onderteken als opdrachtnemer</button>`}
+        ${d.signatures.client ? `<span class="pill completed">✓ Opdrachtgever getekend</span>` : `<button class="btn" onclick="signAs('client')">Onderteken als opdrachtgever</button>`}
+      </div>`;
+  }
+  else if(s==="closed"){
+    body = `<div class="empty-module" style="padding:40px 20px;">
+      <span class="tag" style="background:var(--success-tint);color:var(--success);">✓ Contract actief</span>
+      <h2>Workspace afgerond</h2>
+      <p>Contract + Escrow zijn aangemaakt (status: pending → funden via de Payment-module). Dit contract verschijnt nu in "Actieve contracten" op GoodTrade.</p>
+    </div>`;
+  }
+
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <div class="stage-tracker">
+      ${stageList.map((st,i)=>`${i>0?'<div class="stage-connector"></div>':''}<div class="stage"><div class="node ${i<idx?'done':''} ${i===idx?'current':''}">${stageLabels[st]}</div></div>`).join("")}
+    </div>
+  </div>
+  <div class="card" style="max-width:640px;">
+    <div class="card-head"><div class="card-title"><span class="ic">⇄</span>${stageLabels[s]}</div></div>
+    ${body}
+    ${s!=="closed" ? `
+    <div style="display:flex;justify-content:space-between;margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn ghost btn-sm" onclick="prevStage()" ${idx===0?'disabled':''}>← Vorige fase</button>
+      <button class="btn btn-sm" onclick="nextStage()">Volgende fase →</button>
+    </div>` : `
+    <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn ghost btn-sm" onclick="state.view='goodtrade';render();">← Terug naar GoodTrade</button>
+    </div>`}
+  </div>
+  <p style="font-size:11px;color:var(--slate-light);margin-top:12px;max-width:640px;">In het echte platform is teruggaan naar een eerdere fase niet toegestaan (behalve nieuwe versies binnen Voorwaarden) — hier vrij te verkennen voor demo-doeleinden.</p>`;
+}
+
+function viewCommunityBank(){
+  return `
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-head"><div class="card-title"><span class="drag">⠿⠿</span>Reserves</div></div>
+      ${state.reserves.map(r=>`
+        <div class="ov-row"><div class="ov-top"><span class="lbl">${r.name}${r.threshold?` <span style="color:var(--slate-light);font-weight:500;">(min. ${r.threshold}%)</span>`:""}</span><span class="val">${r.pct}% · ${fmtEUR(state.communityBankTotal*r.pct/100)}</span></div>
+        <div class="thinbar"><div style="width:${r.pct}%;background:${r.threshold && r.pct<r.threshold ? "var(--orange)" : r.color}"></div></div></div>`).join("")}
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title"><span class="ic">◈</span>Reserveverdeling</div></div>
+      <div class="donut-wrap">
+        ${donut(state.reserves.map(r=>({value:r.pct,color:r.color})), 118)}
+        ${legendFor(state.reserves.map(r=>({label:r.name,value:r.pct,color:r.color})))}
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><div class="card-title"><span class="ic">✦</span>Openstaande leningaanvragen</div></div>
+    ${state.loans.map(l=>{
+      const pct = Math.min(100, Math.round((l.votes/l.required)*100));
+      return `<div class="ov-row"><div class="ov-top"><span class="lbl">${l.purpose}</span><span class="val">${l.amount} · ${l.votesFor}% voor</span></div>
+      <div class="thinbar"><div style="width:${pct}%;background:var(--teal)"></div></div>
+      <div style="font-size:11px;color:var(--slate-light);margin-top:3px;">${l.votes}/${l.required} benodigde stemmen · verstuurd naar een steekproef van ${l.audience} leden</div></div>`;
+    }).join("")}
+    <button class="btn ghost" style="margin-top:6px;" onclick="openLoanApplication()">+ Leningaanvraag indienen</button>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="ic">▤</span>Fee-inkomsten</div>
+      <div style="display:flex;gap:8px;">
+        <select class="filter-select"><option>Week 27, 2026</option><option>Week 26, 2026</option><option>Week 25, 2026</option></select>
+        <select class="filter-select"><option>Per week</option><option>Per maand</option><option>Per kwartaal</option><option>Per jaar</option></select>
+      </div>
+    </div>
+    <div class="barchart">
+      ${state.payments.map((v,i)=>`
+        <div class="bcol">
+          <span style="font-size:11px;font-weight:700;color:${v>0?'var(--ink)':'var(--slate-light)'};">${v>0?'€'+v.toLocaleString('nl-NL'):'—'}</span>
+          <div class="bar" style="height:${Math.max(4,(v/9000)*110)}px;background:${v>0?'var(--teal)':'var(--border)'}"></div>
+          <span>${["Ma","Di","Wo","Do","Vr","Za","Zo"][i]}</span>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function renderRookieProfileCard(){
+  const p = state.profiles.rookie;
+  const remaining = ROOKIE_REVIEWS_REQUIRED - p.completed;
+  return `
+  <div class="card" style="max-width:560px;margin-bottom:16px;">
+    <div style="display:flex;gap:16px;align-items:center;margin-bottom:18px;">
+      <div class="avatar" style="width:54px;height:54px;font-size:18px;">${p.initials}</div>
+      <div><div class="dr-title" style="font-size:16px;">${p.name}</div><div class="dr-sub">${p.role}</div></div>
+    </div>
+    <div class="card" style="background:var(--bg);margin-bottom:14px;">
+      <div style="font-weight:700;font-size:13.5px;">${p.completed}/${ROOKIE_REVIEWS_REQUIRED} opdrachten voltooid — nog ${remaining} tot een openbare reputatiescore</div>
+      <div class="thinbar" style="margin-top:8px;"><div style="width:${p.completed/ROOKIE_REVIEWS_REQUIRED*100}%;background:var(--teal)"></div></div>
+      <p style="font-size:11px;color:var(--slate-light);margin:8px 0 0;">Reputatiescore wordt intern al vanaf de eerste opdracht berekend — alleen de publieke weergave (cijfer, sterren) wacht tot dit punt.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="pill verified">✓ Identiteit geverifieerd</span>
+      <span class="pill completed">${p.completed} opdrachten succesvol afgerond</span>
+      <span class="pill open">Geen openstaande geschillen</span>
+    </div>
+  </div>`;
+}
+
+function renderFullProfileCard(){
+  const p = state.profiles.full;
+  return `
+  <div class="card" style="max-width:560px;margin-bottom:16px;">
+    <div style="display:flex;gap:16px;align-items:center;margin-bottom:18px;">
+      <div class="avatar" style="width:54px;height:54px;font-size:18px;">${p.initials}</div>
+      <div><div class="dr-title" style="font-size:16px;">${p.name}</div><div class="dr-sub">${p.role}</div></div>
+    </div>
+    <div class="grid grid-4">
+      <div class="mini-stat c-teal"><div class="m-lbl">Reputatie</div><div class="m-val">${p.score} <span style="font-size:12px;color:var(--slate-light);font-weight:600;">/ 5 (${p.reviewCount} reviews)</span></div></div>
+      <div class="mini-stat c-orange">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div class="m-lbl">Voltooid</div>
+          <select class="filter-select" style="font-size:9.5px;padding:2px 5px;"><option>12 mnd</option><option>Lifetime</option></select>
+        </div>
+        <div class="m-val">${p.completed}</div>
+      </div>
+      <div class="mini-stat c-slate"><div class="m-lbl">Tevredenheid</div><div class="m-val">96%</div></div>
+      <div class="mini-stat c-teal"><div class="m-lbl">Resp. tijd</div><div class="m-val">3u</div></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--slate-light);margin:10px 0 0;">ℹ️ Reputatie-updates zijn volledig automatisch — er is geen beoordelingscommissie.</p>
+  </div>
+
+  <div class="warranty-badge" style="max-width:560px;margin-bottom:16px;">
+    <div class="wb-item">Warranty Offered: 87%<span>Percentage afgeronde opdrachten met garantie</span></div>
+    <div class="wb-item">Gemiddelde garantie: 42 dagen<span>Over alle opdrachten met garantie</span></div>
+    <div class="wb-item">Completion Rate: 99,4%<span>Garantieperiodes zonder claim</span></div>
+  </div>
+
+  <div class="card" style="max-width:560px;margin-bottom:16px;">
+    <div class="card-title" style="font-size:12.5px;margin-bottom:10px;">Recente reviews</div>
+    ${state.reviews.map(r=>`
+      <div class="ov-row">
+        <div class="ov-top"><span class="lbl" style="color:var(--orange);">${'★'.repeat(r.stars)}<span style="color:var(--border);">${'★'.repeat(5-r.stars)}</span></span><span class="val">${r.contractTitle}</span></div>
+        ${r.text ? `<p style="font-size:11.5px;color:var(--slate);margin:2px 0 0;">${r.text}</p>` : ""}
+      </div>`).join("")}
+  </div>`;
+}
+
+function viewProfile(){
+  const isFull = state.profileView === "full";
+  return `
+  <div class="card" style="max-width:560px;margin-bottom:16px;background:var(--bg);">
+    <div class="card-title" style="font-size:11px;color:var(--slate);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Voorbeeldweergave — publiek profiel bij</div>
+    <div class="tabs" style="margin-bottom:0;">
+      <button class="tab ${!isFull?'active':''}" onclick="switchProfileView('rookie')">Rookie-profiel (&lt; 10 opdrachten)</button>
+      <button class="tab ${isFull?'active':''}" onclick="switchProfileView('full')">Volledig profiel (≥ 10 opdrachten)</button>
+    </div>
+  </div>
+
+  ${isFull ? renderFullProfileCard() : renderRookieProfileCard()}
+
+  <div class="grid grid-2b" style="max-width:560px;margin-bottom:16px;">
+    <div class="card" style="cursor:pointer;" onclick="openAviFlow()">
+      <div class="card-title" style="font-size:12.5px;">🪪 Identiteit verifiëren via AVI</div>
+      <p style="font-size:11.5px;color:var(--slate);margin:6px 0 10px;">Decentrale identiteitslaag — bewijs alleen wat nodig is (gesimuleerd).</p>
+      <span class="card-link">Start onboarding →</span>
+    </div>
+    <div class="card" style="cursor:pointer;" onclick="openBankCoupling()">
+      <div class="card-title" style="font-size:12.5px;">◈ Bankkoppeling</div>
+      <p style="font-size:11.5px;color:var(--slate);margin:6px 0 10px;">Koppel een betaalprovider — referentietoken, geen rekeninggegevens.</p>
+      <span class="card-link">Bekijk status →</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;max-width:560px;background:var(--teal-tint);border:1px dashed var(--teal);">
+    <div class="card-title" style="font-size:12.5px;color:var(--teal-dark);">📄 Presentatiepagina</div>
+    <p style="font-size:12px;color:var(--slate);margin:6px 0 0;">Een deelbaar promoblad/mini-website op basis van je portfolio — nog niet gebouwd, staat in de roadmap.</p>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 12px;">
+    <div class="card-title" style="font-size:13px;"><span class="ic">◆</span>Mijn werk — alles op één plek</div>
+    <button class="btn btn-sm" onclick="openJobModal()">+ Job posten</button>
+  </div>
+  <p style="font-size:11.5px;color:var(--slate);margin:0 0 14px;">Als opdrachtgever én als opdrachtnemer bij elkaar — je hoeft niet tussen modules te schakelen om je eigen overzicht te zien.</p>
+
+  <div class="grid grid-2b" style="margin-bottom:16px;">
+    <div class="card dtable" style="padding:0;overflow:hidden;">
+      <div style="padding:14px 14px 8px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="card-title" style="font-size:12.5px;">Door mij geplaatst (opdrachtgever)</div>
+        <select class="filter-select" style="font-size:10px;padding:3px 6px;"><option>Laatste 5</option><option>2026</option><option>2025</option><option>2024</option></select>
+      </div>
+      ${state.jobs.map((j,i)=>`
+        <div class="drow sev-${j.status}" ${j.status==='open'?`style="cursor:pointer;" onclick="state.view='workspace';render();"`:''}>
+          <div class="dr-main"><div class="dr-title">${j.title}</div><div class="dr-sub">${j.region} · ${j.responses} reacties${j.status==='open'?' · klik voor Negotiation Workspace':''}</div></div>
+          <span class="pill ${j.status}">${j.status}</span>
+        </div>`).join("")}
+    </div>
+    <div class="card dtable" style="padding:0;overflow:hidden;">
+      <div style="padding:14px 14px 8px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="card-title" style="font-size:12.5px;">Door mij uitgevoerd (opdrachtnemer)</div>
+        <select class="filter-select" style="font-size:10px;padding:3px 6px;"><option>Laatste 5</option><option>2026</option><option>2025</option><option>2024</option></select>
+      </div>
+      ${state.contracts.map((c,i)=>`
+        <div class="drow sev-${c.status}" style="cursor:pointer;" onclick="openContractDetail(${i})">
+          <div class="dr-main"><div class="dr-title">${c.title}</div><div class="dr-sub">${c.amount} · klik voor volledig traject</div></div>
+          <span class="pill ${c.status}">${c.status}</span>
+        </div>`).join("")}
+    </div>
+  </div>
+  <p style="font-size:11px;color:var(--slate-light);">Geschiedenis van beide rollen staat hier gebundeld — dit is dezelfde onderliggende data als Marketplace/GoodTrade, hier samengevoegd per persoon in plaats van per module.</p>`;
+}
+
+function viewComingSoon(id){
+  const copy = {
+    dispute: "Eerst een zelfservice-stap met een AI-suggestie, pas daarna escalatie naar een onafhankelijke, ingehuurde mediator.",
+    innovation: "Functionele investeringsslots en stemmechaniek. In MVP 1 zie je hier straks alleen een voortgangsindicator richting unlock.",
+    plugins: "Externe producten (verzekering, boekhouding, belastingmodule) die je los kan toggelen — architectuur wordt in MVP 1 al voorbereid."
+  };
+  return `<div class="empty-module"><span class="tag">Gepland voor latere MVP</span><h2>${titles[id][0]}</h2><p>${copy[id]}</p></div>`;
+}
+
+const WALKTHROUGH_IMPLEMENTED = [
+  { name:"Job posten & Marketplace", what:"Opdrachten plaatsen zonder zichtbaar budget, status open/dormant/closed", where:"Sidebar → Marketplace" },
+  { name:"Contacts", what:"Persoonlijk adresboek, gegroepeerd naar rol · Prefer/Avoid-markering per contact (alleen zichtbaar voor jou, geen reputatie-effect, geen melding)", where:"Sidebar → Contacts → klik een contact open" },
+  { name:"Negotiation Workspace", what:"Volledige onderhandelingsflow: introductie → technische intake (vragenbibliotheek) → voorwaarden → offerte → contract preview & ondertekening", where:"Sidebar → GoodTrade → klik op een lopende onderhandeling" },
+  { name:"Escrow & Mijlpalen", what:"Gefaseerde betaling, mijlpaal indienen/goedkeuren/afwijzen (met verplichte reden bij afwijzing), automatische factuurgeneratie, platformvergoeding bij uitbetaling", where:'Sidebar → GoodTrade → klik op een actief contract → tab "Escrow & Mijlpalen"' },
+  { name:"Change Orders (meerwerk)", what:"Volledige conversatiestructuur: motivatie (indiener) → acceptatie met optionele toelichting óf afwijzing met verplichte reden (opdrachtgever) → intrekking van een geaccepteerde, nog niet gefunde Change Order via wederzijdse instemming (twee-staps simulatie)", where:"Zelfde scherm als Escrow & Mijlpalen, onderaan" },
+  { name:"Warranty & Holdback", what:"Garantietermijn instellen, holdback-tijdlijn met geplande uitbetalingen, bevriezing bij een garantieclaim", where:'Sidebar → GoodTrade → klik op een voltooid contract → tab "Garantie" (verschijnt zodra garantieperiode gestart is)' },
+  { name:"Geschil/mediator (vereenvoudigde MVP1-versie)", what:'<strong>Let op — dit zit verstopt, niet vergeten te noemen:</strong> een garantieclaim openen bevriest automatisch het nog niet uitgekeerde deel van de holdback en simuleert een ticket naar een externe mediator. Dit ís het MVP1-geschilmechanisme, ook al staat "Dispute Center" in de sidebar op "SOON" — dat label geldt alleen voor de uitgebreide zelfhulplaag (MVP2+), niet voor dit basismechanisme.', where:'Sidebar → GoodTrade → voltooid contract → tab "Garantie" → knop bij "Claim/dispuut"' },
+  { name:"Community Bank — leningaanvraag", what:"Vier stappen: aanvraag, onderbouwing, steekproef & stemmen (gesimuleerd), uitkomst", where:'Sidebar → Community Bank → "+ Leningaanvraag indienen"' },
+  { name:"Community Bank — reservebedragen", what:"Bedrag naast percentage per reservecategorie (bijv. \"Safety 61% · €25.620\"), niet alleen de verdeling", where:'Sidebar → Dashboard óf Sidebar → Community Bank — kaart "Reserves"' },
+  { name:"Profiel — Rookie Stage & Reviews", what:"Twee profielvarianten (Rookie vs. volledig), verplichte toelichting bij lage beoordeling, wederzijdse reviews", where:"Sidebar → Profiel" },
+  { name:"AVI-onboarding (gesimuleerd)", what:"Drietraps-bootstrap (paspoortchip offline → biometrie on-device → DigiD online), segmentmodel-resultaatscherm. Toekomstversie, zie label in de flow zelf.", where:"Sidebar → Profiel → kaart \"Identiteit verifiëren via AVI\"" },
+  { name:"Payment/Bank Coupling", what:"Bankkoppeling-status en -flow (referentietoken, geen rekeninggegevens), step-up herauthenticatie en asynchrone providerbevestiging bij mijlpaal-uitbetaling", where:'Sidebar → Profiel → kaart "Bankkoppeling" · step-up-modal zichtbaar bij "Goedkeuren" op een mijlpaal' }
+];
+const WALKTHROUGH_PLANNED = [
+  { name:"Presentatiepagina / mini-portfoliowebsite", badge:"MVP1", status:"Nog te bouwen — MVP1-scope, staat als aankondiging op het Profiel-scherm" },
+  { name:"Dispute Center (volledige zelfhulplaag + AI/ML-suggestie)", badge:"MVP2+", status:"Bewust MVP2+ — de vereenvoudigde versie bestaat al, zie hierboven" },
+  { name:"Innovation Fund", badge:"MVP2+", status:"Bewust MVP2+" },
+  { name:"Plugin Marketplace", badge:"MVP2+", status:"Bewust MVP2+" }
+];
+
+function viewWalkthrough(){
+  return `
+  <p style="font-size:12.5px;color:var(--slate);margin:0 0 16px;max-width:720px;">Leeswijzer bij deze demo — geen gebruikershandleiding voor een echt product. Per onderdeel: wat het laat zien en waar je het vindt.</p>
+
+  <div class="card-title" style="font-size:13px;margin-bottom:10px;"><span class="ic">✓</span>Al geïmplementeerd</div>
+  <div class="card dtable" style="padding:0;overflow:hidden;margin-bottom:24px;">
+    ${WALKTHROUGH_IMPLEMENTED.map(item=>`
+      <div class="drow sev-open">
+        <div class="dr-main">
+          <div class="dr-title">${item.name}</div>
+          <div class="dr-sub">${item.what}</div>
+          <div class="dr-sub" style="margin-top:4px;">📍 ${item.where}</div>
+        </div>
+        <div class="dr-right"><span class="pill completed">Geïmplementeerd</span></div>
+      </div>`).join("")}
+  </div>
+
+  <div class="card-title" style="font-size:13px;margin-bottom:10px;"><span class="ic">◯</span>Nog niet geïmplementeerd (bewust, geen gebreken)</div>
+  <div class="card dtable" style="padding:0;overflow:hidden;">
+    ${WALKTHROUGH_PLANNED.map(item=>`
+      <div class="drow sev-dormant">
+        <div class="dr-main">
+          <div class="dr-title">${item.name}</div>
+          <div class="dr-sub">${item.status}</div>
+        </div>
+        <div class="dr-right"><span class="pill dormant">${item.badge}</span></div>
+      </div>`).join("")}
+  </div>`;
+}
+
+function toggleCompleted(){ state.completedOpen = !state.completedOpen; render(); }
+window.toggleCompleted = toggleCompleted;
+
+function openContractDetail(i){ state.contractDetailIndex = i; state.view = "contractDetail"; render(); }
+window.openContractDetail = openContractDetail;
+
+function viewContractDetail(){
+  const c = state.contracts[state.contractDetailIndex];
+  if(!c) return `<p>Contract niet gevonden.</p>`;
+  const ci = state.contractDetailIndex;
+  const stageList = ["introduction","technical_intake","terms","quote","contract_preview","closed"];
+  const stageLabels = {introduction:"Introductie", technical_intake:"Technische intake", terms:"Voorwaarden", quote:"Offerte", contract_preview:"Contract preview", closed:"Afgerond"};
+  const d = state.wsDetail; // reuse the same sample negotiation content for this demo contract
+  const closedDone = c.status === "completed";
+
+  const tabs = [ {id:"overview", label:"Overzicht"}, {id:"escrow", label:"Escrow & Mijlpalen"} ];
+  if(c.warranty.status !== "not_started"){ tabs.push({id:"warranty", label:"Garantie"}); }
+  const activeTab = tabs.some(t=>t.id===state.contractDetailTab) ? state.contractDetailTab : "overview";
+
+  let tabBody = "";
+  if(activeTab==="overview") tabBody = renderOverviewTab(c, d, closedDone);
+  else if(activeTab==="escrow") tabBody = renderEscrowTab(c, ci);
+  else if(activeTab==="warranty") tabBody = renderWarrantyTab(c, ci);
+
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><div class="card-title"><span class="ic">◈</span>${c.title}</div><span class="pill ${c.status}">${c.status}</span></div>
+    <div class="stage-tracker">
+      ${stageList.map((s,i)=>{ const done = s==="closed" ? closedDone : true; return `${i>0?'<div class="stage-connector"></div>':''}<div class="stage"><div class="node ${done?'done':''}">${stageLabels[s]}</div></div>`; }).join("")}
+    </div>
+  </div>
+  <div class="tabs">
+    ${tabs.map(t=>`<button class="tab ${activeTab===t.id?'active':''}" onclick="switchContractTab('${t.id}')">${t.label}</button>`).join("")}
+  </div>
+  ${tabBody}
+  <button class="btn ghost btn-sm" style="margin-top:16px;" onclick="state.view='goodtrade';render();">← Terug naar GoodTrade</button>`;
+}
+
+function renderOverviewTab(c, d, closedDone){
+  return `
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-title" style="font-size:12.5px;margin-bottom:10px;">Samenvatting</div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Bedrag</span><span class="val">${c.amount}</span></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Escrow-status</span><span class="val">${c.escrow}</span></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Werkuren</span><span class="val">${d.terms.workingHours||"—"}</span></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Garantie</span><span class="val">${c.warranty.periodDays===0?'Geen':c.warranty.periodDays+' dagen ('+c.warranty.holdbackPct+'% holdback)'}</span></div></div>
+      <div class="ov-row"><div class="ov-top"><span class="lbl">Ondertekend door</span><span class="val">${closedDone?'Beide partijen ✓':'Nog niet beide partijen'}</span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="font-size:12.5px;margin-bottom:10px;">Correspondentie (Introductie-fase)</div>
+      <div class="chat-thread" style="max-height:200px;">
+        ${d.messages.map(m=>`<div class="chat-bubble ${m.from}"><div class="cb-role">${m.from==='client'?'Opdrachtgever':'Opdrachtnemer'}</div>${m.text}</div>`).join("")}
+      </div>
+      <p style="font-size:10.5px;color:var(--slate-light);margin-top:10px;">Correspondentie blijft bewaard, ook na afronding — nodig als bewijs van het gevolgde traject.</p>
+    </div>
+  </div>`;
+}
+
+function renderChangeOrderCard(ci, co, coi){
+  const rejectOpen = state.activeCoRejectBox === (ci+"|"+coi);
+  let html = `<div class="milestone-card">
+    <div class="milestone-head"><div><div class="milestone-title">${co.desc}</div><div class="milestone-sub">+${fmtEUR(co.amount)}</div></div><span class="pill ${co.status}">${co.status}</span></div>
+    <div class="reject-box" style="margin-top:10px;">
+      <div class="field-label" style="margin-top:0;">Motivatie (indiener)</div>
+      <p style="font-size:12.5px;margin:0;">${co.motivation}</p>
+    </div>`;
+
+  if(co.status==="proposed"){
+    html += `<div style="margin-top:10px;">
+      <label class="field-label" style="margin-top:0;">Toelichting bij acceptatie (optioneel)</label>
+      <textarea id="co-approval-${ci}-${coi}" class="field-input" rows="2" oninput="updateApprovalDraft(${ci},${coi},this.value)">${(co._approvalDraft||"").replace(/</g,"&lt;")}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-sm" onclick="acceptChangeOrder(${ci},${coi})">Accepteren (ontvanger)</button>
+        <button class="btn ghost btn-sm" onclick="toggleCoRejectBox(${ci},${coi})">Afwijzen</button>
+      </div>
+      ${rejectOpen ? `<div class="reject-box">
+        <label class="field-label">Reden voor afwijzing (verplicht)</label>
+        <textarea id="co-reject-${ci}-${coi}" class="field-input" rows="2" oninput="updateCoRejectDraft(${ci},${coi},this.value)">${(co._rejectDraft||"").replace(/</g,"&lt;")}</textarea>
+        <button class="btn btn-sm" style="margin-top:8px;" onclick="rejectChangeOrder(${ci},${coi})">Afwijzing bevestigen</button>
+      </div>` : ""}
+    </div>`;
+  }
+  else if(co.status==="accepted"){
+    html += `<div class="reject-box" style="margin-top:10px;">
+      <div class="field-label" style="margin-top:0;">Reactie (opdrachtgever)</div>
+      <p style="font-size:12.5px;margin:0;">✓ Geaccepteerd${co.approvalNote ? ': '+co.approvalNote : '.'}</p>
+    </div>`;
+    if(co.funded){
+      html += `<p class="fee-note">Intrekking na funding verloopt via de geschillenprocedure (zie Garantie-tab/mediator-mechanisme), niet via een eenvoudige statuswijziging.</p>`;
+    } else if(co.withdrawalStatus==="requested"){
+      html += `<div class="fee-note">Wacht op bevestiging wederpartij.</div>
+      <button class="btn ghost btn-sm" style="margin-top:8px;" onclick="confirmWithdrawChangeOrder(${ci},${coi})">Bevestig intrekking namens wederpartij — gesimuleerd</button>`;
+    } else {
+      html += `<button class="btn ghost btn-sm" style="margin-top:8px;" onclick="requestWithdrawChangeOrder(${ci},${coi})">Intrekken (wederzijdse instemming)</button>`;
+    }
+  }
+  else if(co.status==="rejected"){
+    html += `<div class="reject-box" style="margin-top:10px;">
+      <div class="field-label" style="margin-top:0;">Reactie (opdrachtgever)</div>
+      <p style="font-size:12.5px;margin:0;">✗ Afgewezen: ${co.rejectionReason}</p>
+    </div>`;
+  }
+  else if(co.status==="withdrawn"){
+    html += `<div class="fee-note">Ingetrokken met wederzijdse instemming (gesimuleerd) — beide partijen hebben ingestemd.</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function renderEscrowTab(c, ci){
+  const routeLabel = c.paymentRoute==="phased" ? "Gefaseerd" : "In één keer";
+  let html = `
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><div class="card-title"><span class="ic">◈</span>Betaalroute</div><span class="pill ${c.paymentRoute==='phased'?'active':'funded'}">${routeLabel}</span></div>`;
+  if(c.paymentRoute==="phased"){
+    const sum = contractPhaseSum(c);
+    html += `<p style="font-size:11.5px;color:var(--slate);margin:0 0 10px;">Fasebedragen tellen op tot <strong style="color:${sum===100?'var(--success)':'var(--danger)'}">${sum}%</strong> van het offertebedrag (${c.amount}).</p>`;
+    c.milestones.forEach(m=>{
+      html += `<div class="ov-row"><div class="ov-top"><span class="lbl">${m.desc}</span><span class="val">${m.pct}% · ${fmtEUR(milestoneAmount(c,m))}</span></div></div>`;
+    });
+  } else {
+    html += `<p style="font-size:11.5px;color:var(--slate);margin:0;">Het volledige bedrag (${c.amount}) wordt in één keer vrijgegeven na ondertekening van de eindevaluatie door beide partijen.</p>`;
+  }
+  html += `</div>`;
+
+  if(c.paymentRoute==="phased"){
+    html += `<div class="card-title" style="font-size:13px;margin-bottom:10px;"><span class="ic">▤</span>Mijlpalen</div>`;
+    c.milestones.forEach((m,mi)=>{
+      const key = ci+"|"+mi;
+      const rejectOpen = state.activeRejectBox === key;
+      html += `<div class="milestone-card st-${m.status}">
+        <div class="milestone-head">
+          <div><div class="milestone-title">${m.desc}</div><div class="milestone-sub">${m.pct}% · ${fmtEUR(milestoneAmount(c,m))}</div></div>
+          <span class="pill ${m.status}">${m.status}</span>
+        </div>`;
+      if(m.status==="pending"){
+        html += `<div style="margin-top:10px;"><button class="btn btn-sm" onclick="submitMilestone(${ci},${mi})">Mijlpaal indienen (opdrachtnemer)</button></div>`;
+      } else if(m.status==="submitted" && m.payoutPending){
+        html += `<div class="fee-note">⏳ Uitbetaling in behandeling — wacht op providerbevestiging (asynchroon, nooit alleen op een synchrone reactie vertrouwen).</div>
+        <div style="margin-top:8px;"><button class="btn btn-sm" onclick="finalizeMilestonePayout(${ci},${mi})">Simuleer providerwebhook</button></div>`;
+      } else if(m.status==="submitted"){
+        html += `<div style="margin-top:10px;display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="requestApproveMilestone(${ci},${mi})">Goedkeuren (opdrachtgever)</button>
+          <button class="btn ghost btn-sm" onclick="toggleRejectBox(${ci},${mi})">Afwijzen</button>
+        </div>`;
+        if(rejectOpen){
+          html += `<div class="reject-box">
+            <label class="field-label">Reden voor afwijzing (verplicht)</label>
+            <textarea id="reject-${ci}-${mi}" class="field-input" rows="2" oninput="updateRejectDraft(${ci},${mi},this.value)">${(m._rejectDraft||"").replace(/</g,"&lt;")}</textarea>
+            <button class="btn btn-sm" style="margin-top:8px;" onclick="confirmReject(${ci},${mi})">Afwijzing bevestigen</button>
+          </div>`;
+        }
+      } else if(m.status==="rejected"){
+        html += `<div class="reject-box"><div class="field-label" style="margin-top:0;">Toelichting</div><p style="font-size:12.5px;margin:0;">${m.rejectReason}</p>
+          <button class="btn ghost btn-sm" style="margin-top:8px;" onclick="resubmitMilestone(${ci},${mi})">Opnieuw indienen (opdrachtnemer)</button></div>`;
+      } else if(m.status==="paid"){
+        const gross = milestoneAmount(c,m);
+        html += `<div class="fee-note">Uitbetaald bedrag: ${fmtEUR(payoutAfterFee(gross))} (incl. 2% platformvergoeding, ingehouden bij uitbetaling — niet bij funding).</div>`;
+      }
+      html += `</div>`;
+    });
+  }
+
+  const coBlocked = c.warranty.status !== "not_started";
+  html += `<div class="card" style="margin-top:16px;">
+    <div class="card-head"><div class="card-title"><span class="ic">✎</span>Change Orders</div>
+      ${coBlocked ? `<span class="pill closed">Niet meer mogelijk — garantiefase gestart</span>` : `<button class="btn ghost btn-sm" onclick="toggleChangeOrderForm()">+ Meerwerk voorstellen</button>`}
+    </div>`;
+  if(state.changeOrderForm.open && !coBlocked){
+    html += `<div style="margin-bottom:14px;">
+      <label class="field-label">Omschrijving</label>
+      <input id="co-desc" class="field-input" value="${state.changeOrderForm.desc.replace(/"/g,'&quot;')}" oninput="updateChangeOrderField('desc', this.value)" placeholder="Bijv. extra pagina's toevoegen aan de website">
+      <label class="field-label">Bedrag (meerwerk)</label>
+      <input id="co-amount" class="field-input" style="max-width:160px;" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.changeOrderForm.amount}" oninput="updateChangeOrderField('amount', this.value)">
+      <label class="field-label">Motivatie (verplicht)</label>
+      <textarea id="co-motivation" class="field-input" rows="2" oninput="updateChangeOrderField('motivation', this.value)">${(state.changeOrderForm.motivation||"").replace(/</g,"&lt;")}</textarea>
+      <button class="btn btn-sm" style="margin-top:10px;" onclick="submitChangeOrder(${ci})">Indienen (leesbevestiging als indiener)</button>
+      <div class="fee-note">Dit voorstel vervalt automatisch als de wederpartij niet reageert binnen een periode gelijk aan de opleveringstermijn van de oorspronkelijke opdracht, met een fallback-maximum van 90 dagen.</div>
+    </div>`;
+  }
+  if(c.changeOrders.length===0 && !state.changeOrderForm.open){
+    html += `<p style="font-size:12px;color:var(--slate);margin:0;">Geen meerwerkvoorstellen.</p>`;
+  }
+  c.changeOrders.forEach((co,coi)=>{ html += renderChangeOrderCard(ci, co, coi); });
+  html += `</div>`;
+
+  const paidGate = allMilestonesPaid(c);
+  html += `<div class="card" style="margin-top:16px;">
+    <div class="card-title" style="font-size:13px;margin-bottom:10px;"><span class="ic">✓</span>Eindevaluatie</div>`;
+  if(!paidGate){
+    html += `<p style="font-size:12px;color:var(--slate);margin:0;">Alle mijlpalen moeten zijn uitbetaald vóór de eindevaluatie ondertekend kan worden.</p>`;
+  } else if(c.finalEvaluation.invoiceGenerated){
+    html += `<span class="pill completed">✓ Afgerond — factuur automatisch gegenereerd</span>`;
+    html += renderReviewWidget(c, ci);
+  } else {
+    html += `<div style="display:flex;gap:8px;">
+      ${c.finalEvaluation.contractorSigned ? `<span class="pill completed">✓ Opdrachtnemer getekend</span>` : `<button class="btn btn-sm" onclick="signFinalEvaluation(${ci},'contractor')">Onderteken (opdrachtnemer)</button>`}
+      ${c.finalEvaluation.clientSigned ? `<span class="pill completed">✓ Opdrachtgever getekend</span>` : `<button class="btn btn-sm" onclick="signFinalEvaluation(${ci},'client')">Onderteken (opdrachtgever)</button>`}
+    </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderWarrantyTab(c, ci){
+  const w = c.warranty;
+  const sched = holdbackSchedule(c);
+  let html = `<div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><div class="card-title"><span class="ic">◈</span>Garantie & Holdback</div><span class="pill ${w.status==='frozen'||w.status==='claimed'?'frozen':w.status==='completed'?'completed':'active'}">${w.status}</span></div>
+    <div class="ov-row"><div class="ov-top"><span class="lbl">Garantietermijn</span><span class="val">${w.periodDays} dagen</span></div></div>
+    <div class="ov-row"><div class="ov-top"><span class="lbl">Holdback-percentage</span><span class="val">${w.holdbackPct}%</span></div></div>
+    <div class="ov-row"><div class="ov-top"><span class="lbl">Direct vrijgegeven bij Completion</span><span class="val">${fmtEUR(sched.directRelease)}</span></div></div>
+  </div>`;
+
+  if(w.periodDays===0){
+    html += `<p style="font-size:12.5px;color:var(--slate);">Geen garantietermijn overeengekomen — dit contract heeft geen holdback-module.</p>`;
+    return html;
+  }
+
+  html += `<div class="card" style="margin-bottom:16px;">
+    <div class="card-title" style="font-size:13px;margin-bottom:4px;">Holdback-tijdlijn</div>
+    <div class="hb-timeline">
+      <div class="hb-step done"><div class="hb-dot"></div><div class="hb-lbl">Completion</div><div class="hb-amt">${fmtEUR(sched.directRelease)}</div><div class="hb-status done">Vrijgegeven</div></div>
+      ${sched.steps.map(s=>{
+        const released = s.day <= w.simDay;
+        const frozen = (w.status==="frozen"||w.status==="claimed") && !released;
+        const cls = released ? "done" : frozen ? "frozen" : "";
+        const label = released ? "Vrijgegeven" : frozen ? "Bevroren" : "Gepland";
+        return `<div class="hb-step ${cls}"><div class="hb-dot"></div><div class="hb-lbl">Dag ${s.day}</div><div class="hb-amt">${fmtEUR(s.amount)}</div><div class="hb-status ${cls||'pending'}">${label}</div></div>`;
+      }).join("")}
+    </div>`;
+  if(w.status==="active"){
+    html += `<div style="margin-top:10px;"><button class="btn btn-sm" onclick="advanceWarrantyTime(${ci})">Simuleer tijdsverloop (+15 dagen)</button>
+      <span style="font-size:11.5px;color:var(--slate);margin-left:10px;">Huidige dag: ${w.simDay} / ${w.periodDays}</span></div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="card">
+    <div class="card-title" style="font-size:13px;margin-bottom:8px;">Claim / dispuut</div>`;
+  if(w.status==="frozen" || w.status==="claimed"){
+    html += `<p style="font-size:12.5px;"><strong>Gemeld:</strong> ${w.claim.description}</p>
+      <p style="font-size:11.5px;color:var(--slate);">Geschil gemeld → ticket aangemaakt buiten platform. Resterende holdback bevroren; reeds uitgekeerde delen blijven definitief.</p>`;
+  } else if(w.status==="active"){
+    html += `<button class="btn ghost btn-sm" onclick="toggleClaimForm()">Claim/dispuut melden</button>`;
+    if(state.claimForm.open){
+      html += `<div class="reject-box">
+        <label class="field-label">Beschrijf het probleem</label>
+        <textarea id="claimText" class="field-input" rows="3" oninput="updateClaimDraft(this.value)">${(state.claimForm.text||"").replace(/</g,"&lt;")}</textarea>
+        <button class="btn btn-sm" style="margin-top:8px;" onclick="submitClaim(${ci})">Claim indienen</button>
+      </div>`;
+    }
+  } else {
+    html += `<p style="font-size:12.5px;color:var(--slate);margin:0;">Garantieperiode volledig verstreken zonder claim.</p>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function openJobModal(){ document.getElementById("jobModalOverlay").style.display = "flex"; }
+function closeJobModal(){ document.getElementById("jobModalOverlay").style.display = "none"; }
+function submitJobModal(){
+  const title = document.getElementById("jm-title").value.trim() || "Naamloze job";
+  const region = document.getElementById("jm-region").value.trim() || "Onbekend";
+  const priority = document.getElementById("jm-priority").value;
+  state.jobs.unshift({ title, status:"open", region, responses:0, priority });
+  closeJobModal();
+  if(state.view !== "marketplace" && state.view !== "profile"){ state.view = "marketplace"; }
+  render();
+}
+window.openJobModal = openJobModal;
+window.closeJobModal = closeJobModal;
+window.submitJobModal = submitJobModal;
+
+function renderContent(){
+  const el = document.getElementById("content");
+  document.getElementById("pageTitle").textContent = titles[state.view][0];
+  document.getElementById("pageSub").textContent = titles[state.view][1];
+  const map = {
+    dashboard: viewDashboard, marketplace: viewMarketplace, contacts: viewContacts,
+    goodtrade: viewGoodTrade, workspace: viewWorkspaceDetail, contractDetail: viewContractDetail, communitybank: viewCommunityBank, profile: viewProfile,
+    dispute: ()=>viewComingSoon("dispute"), innovation: ()=>viewComingSoon("innovation"), plugins: ()=>viewComingSoon("plugins"),
+    loanApplication: viewLoanApplication, walkthrough: viewWalkthrough, avi: viewAVI, bankCoupling: viewBankCoupling
+  };
+  el.innerHTML = (map[state.view] || viewDashboard)();
+}
+function render(){
+  const active = document.activeElement;
+  let activeId = null, selStart = null, selEnd = null;
+  if(active && active.id && (active.tagName==="INPUT" || active.tagName==="TEXTAREA")){
+    activeId = active.id;
+    try{ selStart = active.selectionStart; selEnd = active.selectionEnd; }catch(e){}
+  }
+  renderSidebar();
+  renderContent();
+  if(activeId){
+    const el = document.getElementById(activeId);
+    if(el){
+      el.focus();
+      if(selStart!==null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} }
+    }
+  }
+}
+render();
+</script>
+</body>
+</html>
