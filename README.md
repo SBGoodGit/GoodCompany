@@ -6,7 +6,7 @@ Part of the broader [GoodCompany Ecosystem](https://github.com/SBGoodGit/goodcom
 
 ## Live showcase
 
-**[View the interactive demo →](https://sbgoodgit.github.io/goodcompany/)**
+**[View the interactive demo →](https://sbgoodgit.github.io/GoodCompany/showcase/)**
 
 A UI-only showcase (no real backend, no real payments) demonstrating the full user experience: job posting, structured negotiation, escrow/milestone payments, warranty & holdback, Community Bank lending, reputation, and a simulated AVI identity onboarding flow.
 
