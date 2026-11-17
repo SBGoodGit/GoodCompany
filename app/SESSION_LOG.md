@@ -13,7 +13,7 @@
 
 **Unfinished / notes for the next session:**
 
-- The assignment's first step `git restore showcase/index.html && git pull` was **not run**: the permission system blocked it in this session. The `mvp1` branch was created from the local `main` (2 commits behind GitHub). Before or at the start of session 2: run that step, then rebase `mvp1` onto the updated `main` (`git rebase main` on `mvp1`). Only `app/` and `docs/spec/` were added; nothing else was changed, so no conflicts are expected.
+- The assignment's first step `git restore showcase/index.html && git pull` was blocked during the build; it was run afterwards on Sander's instruction, and `mvp1` was rebased onto the updated `main` (f4a7339). All tests passed after the rebase.
 - Contract detail shows the frozen contract, milestones and audit trail; it has no funding or escrow view yet.
 - Notifications are stored and listed on the dashboard; the notification centre, full admin settings UI and system jobs (workspace inactivity, contact reconciliation, etc.) belong to session 3.
 
