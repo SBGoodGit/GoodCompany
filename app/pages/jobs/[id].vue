@@ -34,22 +34,33 @@ async function setStatus(status: string) {
       <div v-if="data.is_owner" class="small" style="margin-top: 0.5rem">
         Indicative budget (only you see this): <b><Money :value="data.job.indicative_budget" /></b>
       </div>
-      <div v-if="data.is_owner && !data.job.selected_contractor_id" class="row" style="margin-top: 0.75rem">
-        <button v-if="data.job.status === 'open'" class="btn secondary small" @click="setStatus('dormant')">Make dormant</button>
-        <button v-if="data.job.status === 'dormant'" class="btn secondary small" @click="setStatus('open')">Reopen</button>
-        <button v-if="data.job.status !== 'closed'" class="btn danger small" @click="setStatus('closed')">Close job</button>
+      <div v-if="data.is_owner && !data.job.selected_contractor_id && data.job.status !== 'closed'" class="row" style="margin-top: 0.75rem">
+        <label class="inline-check" data-test="pause-applicants">
+          <input type="checkbox" :checked="data.job.status === 'dormant'" @change="setStatus(($event.target as HTMLInputElement).checked ? 'dormant' : 'open')" />
+          Pause new applicants
+        </label>
+        <span class="small muted">{{ data.job.status === 'dormant' ? 'No new contractors can respond. Existing conversations continue.' : 'Contractors can respond to this job.' }}</span>
+        <span class="spacer" />
+        <button class="btn danger small" @click="setStatus('closed')">Close job</button>
       </div>
     </div>
     <div v-if="error" class="error">{{ error }}</div>
 
-    <div v-if="data.is_owner" class="card">
-      <h3>Workspaces with candidates</h3>
+    <div v-if="data.is_owner" class="card" data-test="conversations">
+      <h3>Conversations</h3>
+      <p v-if="data.candidates" class="small muted">
+        Introductions are unlimited. Past the introduction: {{ data.candidates.active }} of {{ data.candidates.limit }} candidates
+        (technical intake, terms or quote) · swaps used {{ data.candidates.swaps_used }} of {{ data.candidates.swaps_max }}.
+        You move a candidate into the technical intake from their conversation.
+      </p>
       <p v-if="!data.workspaces.length" class="muted small">No contractor has responded yet.</p>
       <table v-else>
-        <thead><tr><th>Contractor</th><th>Stage</th><th>Outcome</th></tr></thead>
-        <tbody><tr v-for="w in data.workspaces" :key="w.id">
-          <td><NuxtLink :to="`/workspaces/${w.id}`">{{ w.contractor_name }}</NuxtLink></td>
-          <td>{{ w.stage.replace('_', ' ') }}</td><td>{{ w.outcome.replaceAll('_', ' ') }}</td>
+        <thead><tr><th>Contractor</th><th>Stage</th><th>Last activity</th><th /></tr></thead>
+        <tbody><tr v-for="w in data.workspaces" :key="w.id" :data-test="`conversation-${w.contractor_name}`">
+          <td>{{ w.contractor_name }}</td>
+          <td><span class="tag" :class="{ grey: w.stage === 'closed' }">{{ w.stage === 'closed' ? w.outcome.replaceAll('_', ' ') : w.stage.replace('_', ' ') }}</span></td>
+          <td class="small">{{ new Date(w.last_activity_at).toLocaleString() }}</td>
+          <td><NuxtLink class="btn secondary small" :to="`/workspaces/${w.id}`">Open</NuxtLink></td>
         </tr></tbody>
       </table>
     </div>

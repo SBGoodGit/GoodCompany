@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { phaseView } from '~~/shared/estimate'
 // Contract detail with the simulated escrow (§11 GoodTrade — Contracts and Escrow).
 // Every money action is prepared, summarised and signed with step-up; the ledger applies it
 // once all required parties have signed.
@@ -45,6 +46,13 @@ const me = computed(() => useMe().value?.user.id)
 const name = (uid: string) => d.value?.names[uid] ?? 'other party'
 
 const openRequests = computed(() => (e.value?.requests ?? []).filter((r: any) => r.status === 'open'))
+/** The estimate lines (or section totals) of the phase a request covers, at the quote's detail level (D28 §C8). */
+function requestLines(r: any) {
+  const view = s.value?.quote?.estimate
+  if (!view || r.repair_agreement_id) return []
+  const m = (e.value?.milestones ?? []).find((x: any) => x.id === r.milestone_id)
+  return m ? phaseView(view, m.sequence) : []
+}
 const requestFor = (mid: string) => openRequests.value.find((r: any) => r.milestone_id === mid && !r.repair_agreement_id)
 const openDisputes = computed(() => (e.value?.disputes ?? []).filter((x: any) => ['between_parties', 'mediator_active', 'advice_issued'].includes(x.status)))
 const pending = computed(() => (e.value?.actions ?? []).filter((a: any) => a.status === 'awaiting_signatures'))
@@ -185,6 +193,14 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
     <!-- Open completion requests -->
     <div v-for="r in openRequests" :key="r.id" class="card" data-test="open-request">
       <h3>{{ r.repair_agreement_id ? 'Repair delivered' : r.is_final ? 'Final delivery' : 'Milestone completed' }} — {{ money(r.requested_amount) }} requested</h3>
+      <table v-if="requestLines(r).length" class="small" data-test="request-lines">
+        <thead><tr><th>This phase covers</th><th v-if="s.quote.estimate.detail_level === 'lines'">Quantity</th><th>Amount</th></tr></thead>
+        <tbody><tr v-for="(x, i) in requestLines(r)" :key="i">
+          <td>{{ x.title }}<span v-if="x.kind === 'material'" class="muted"> (material, from the materials budget)</span></td>
+          <td v-if="s.quote.estimate.detail_level === 'lines'">{{ x.quantity }} {{ x.unit }} × {{ money(x.unit_price) }}</td>
+          <td>{{ money(x.amount) }}</td>
+        </tr></tbody>
+      </table>
       <p class="small">Evidence: {{ r.evidence_text }} <span class="muted">(hash {{ r.evidence_hash.slice(0, 12) }}…)</span></p>
       <p v-if="r.response_due_at" class="small">
         Response window: <b>{{ countdown(r.response_due_at) }}</b> (until {{ r.response_due_at.slice(0, 10) }}) · payment deadline {{ r.payment_deadline_at?.slice(0, 10) }}.

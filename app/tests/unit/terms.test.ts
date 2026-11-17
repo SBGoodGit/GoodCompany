@@ -14,12 +14,10 @@ const base = (over: Partial<TermsInput> = {}): TermsInput => ({
 })
 
 describe('validateTerms (§3.4)', () => {
-  it('accepts phases + materials + 2% fee = 100%', () => {
+  it('accepts a valid phase structure; percentages are no longer part of the terms (round 2)', () => {
     expect(validateTerms(base())).toEqual([])
-  })
-  it('rejects a sum other than 100%', () => {
-    const errors = validateTerms(base({ materials_budget_percentage: 25 }))
-    expect(errors.join(' ')).toMatch(/must together make 100%/)
+    const noPct = base({ materials_budget_percentage: null, payment_phases: base().payment_phases.map(({ percentage: _p, ...rest }) => rest) })
+    expect(validateTerms(noPct)).toEqual([])
   })
   it('allows only warranty periods 0, 15, 30, 90 (0 allowed, O26)', () => {
     expect(validateTerms(base({ warranty_period_days: 0 }))).toEqual([])
@@ -28,13 +26,6 @@ describe('validateTerms (§3.4)', () => {
   it('fixes the holdback at 10%', () => {
     expect(validateTerms(base({ holdback_percentage: 15 })).join(' ')).toMatch(/fixed at 10%/)
     expect(validateTerms(base({ holdback_percentage: 10 }))).toEqual([])
-  })
-  it('requires the final phase to be at least 10% of the contract value (§3.4, D27)', () => {
-    const p = base().payment_phases
-    const nine = base({ payment_phases: [p[0], { ...p[1], percentage: 49 }, { ...p[2], percentage: 9 }] })
-    expect(validateTerms(nine).join(' ')).toMatch(/final phase must be at least 10% of the contract value.*now 9%/)
-    const ten = base({ payment_phases: [p[0], { ...p[1], percentage: 48 }, { ...p[2], percentage: 10 }] })
-    expect(validateTerms(ten)).toEqual([])
   })
   it('the holdback is 10% of the contract value, rounded down to the cent', () => {
     expect(holdbackOf(1_000_000, 10)).toBe(100_000)
@@ -60,9 +51,6 @@ describe('validateTerms (§3.4)', () => {
   })
   it('requires a positive execution period', () => {
     expect(validateTerms(base({ execution_period_days: 0 })).join(' ')).toMatch(/Execution period/)
-  })
-  it('uses the configured fee rate', () => {
-    expect(validateTerms(base(), { feePercentage: 3, warrantyOptions: [0, 15, 30, 90], holdbackPercentage: 10 }).length).toBeGreaterThan(0)
   })
 })
 

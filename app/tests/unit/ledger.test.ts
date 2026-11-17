@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
 import { applyAction, escrowBalance, holdbackSchedule, requiredSigners } from '../../server/ledger/core'
 import type { Action, ApplyContext, LedgerState } from '../../server/ledger/types'
+import { computeEstimate } from '../../shared/estimate'
 
 const CLIENT = 'client', CONTRACTOR = 'contractor', SUPPLIER = 'supplier', MEDIATOR = 'mediator', MEDIATOR2 = 'mediator2'
 const DAY = 86_400_000
@@ -52,9 +53,28 @@ function run(s: LedgerState, type: Action['type'], params: Record<string, any> =
 const go = (...a: Parameters<typeof run>) => run(...a).state
 const openRequest = (s: LedgerState) => s.requests.find((r) => r.status === 'open')!
 
+/** §7.1 built through an itemised estimate (round 2): the lines produce the same contract. */
+function stateFromEstimate() {
+  const phases = [{ sequence: 1, kind: 'advance' as const, description: 'Advance' }, { sequence: 2, kind: 'work' as const, description: 'Rough work' }, { sequence: 3, kind: 'final' as const, description: 'Delivery' }]
+  const e = computeEstimate({
+    sections: [{ key: 'prep', title: 'Preparation' }, { key: 'build', title: 'Build' }],
+    lines: [
+      { section: 'prep', description: 'Planning and mobilisation', kind: 'labour', quantity: 1, unit: 'lump sum', unit_price: 100_000, phase: 1 },
+      { section: 'build', description: 'Rough work', kind: 'labour', quantity: 40, unit: 'hour', unit_price: 7_000, phase: 2 },
+      { section: 'build', description: 'Finishing and delivery', kind: 'labour', quantity: 50, unit: 'hour', unit_price: 6_000, phase: 3 },
+      { section: 'build', description: 'Timber and fixings', kind: 'material', quantity: 1, unit: 'lump sum', unit_price: 300_000, phase: 2 },
+    ],
+  }, phases, { feePercentage: 2, holdbackPercentage: 10 })
+  expect(e.errors).toEqual([])
+  return state({
+    total: e.total_amount, fee: e.fee_amount, materials: e.materials_budget_amount,
+    milestones: e.phase_amounts.map((p) => [p.kind, p.amount] as [string, number]),
+  })
+}
+
 describe('§7.1 worked example', () => {
-  it('contract 10,000.00: contractor 7,200.00, suppliers 2,600.00, fee 200.00, escrow empty', () => {
-    let s = go(state(), 'fund')
+  it.each([['typed amounts', () => state()], ['an itemised estimate', stateFromEstimate]])('contract 10,000.00 from %s: contractor 7,200.00, suppliers 2,600.00, fee 200.00, escrow empty', (_label, initial) => {
+    let s = go(initial(), 'fund')
     expect(s.contract.status).toBe('active')
     expect(s.account!.fee_reserved).toBe(20_000)
     expect(s.account!.materials_budget).toBe(300_000)
