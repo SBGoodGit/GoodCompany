@@ -55,3 +55,16 @@ UI: contract page with escrow overview (labelled simulated), signing dialog with
 **Unfinished:** nothing from parts 1–12 of the assignment. What the spec leaves out or open is listed in `BUILD_REPORT.md` §2.
 
 **Next:** Sander reviews `BUILD_REPORT.md` and decides on push/merge of branch `mvp1`.
+
+## Corrections — 17 November 2026
+
+On Build Spec v3.008 / Decision Log v1.012 (D27), copied into `docs/spec/`. Choices in `BUILD_NOTES.md` 82–85.
+
+1. **Holdback always 10%** — `min(…)` removed from the ledger; final phase ≥ 10% in terms validation, editor and Change Orders; holdback rounded down to the cent.
+2. **Contractor can open a dispute** — `object` signed by the objecting party; the contractor disputes the whole amount of one of their open requests; contract page option.
+3. **Administrative check before a loan vote (OD5)** — statuses `admin_check` and `returned`, migration `20261120000001_corrections.sql`, admin check route and admin page section; voting and invitations start on approval.
+
+**Tests:** 82 Vitest (new: final phase ≥ 10%, holdback rounding, full holdback at a 10% final phase, Change Order guard, contractor objection) + 13 Playwright (new: OD5 return/approve through the admin page; the loan cycle test now passes the check). The §7.1 example still passes exactly. All pass.
+
+**Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
+

@@ -1,4 +1,4 @@
-import { mandatoryClauses } from '../../shared/terms'
+import { holdbackOf, mandatoryClauses } from '../../shared/terms'
 
 export type Party = 'client' | 'contractor'
 
@@ -45,7 +45,7 @@ export async function buildContractPreview(tx: Tx, ws: any) {
   const [mediator] = await tx`select u.id, p.display_name from users u join profiles p on p.user_id = u.id where u.id = ${terms.mediator_id}`
   const phases = [...terms.payment_phases].sort((a: any, b: any) => a.sequence - b.sequence)
   const amountBySeq = new Map<number, number>(quote.phase_amounts.map((p: any) => [p.sequence, p.amount]))
-  const holdback = Math.round((quote.total_amount * terms.holdback_percentage) / 100)
+  const holdback = holdbackOf(quote.total_amount, terms.holdback_percentage)
   const snapshot = {
     format: 'goodcompany-contract-v1',
     workspace_id: ws.id,

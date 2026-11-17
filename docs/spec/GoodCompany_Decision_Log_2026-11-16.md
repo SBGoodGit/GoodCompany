@@ -12,8 +12,9 @@
 <!-- v1.009 (17-11-2026): D10 vereenvoudigd: 2% bevroren bij storting en in één keer overgemaakt bij afronding van de opdracht; P6 vervalt -->
 <!-- v1.010 (17-11-2026): O24 en O26 besloten (reactietermijn alleen voor volledige oplevering; holdback ook bij 0 dagen garantie); O25 uitgesteld -->
 <!-- v1.011 (17-11-2026): Build Spec v3.007 geaccepteerd door de product owner -->
+<!-- v1.012 (17-11-2026): D27 toegevoegd: correcties na de MVP1-bouw -->
 
-Decisions taken by the product owner on 16 and 17 November 2026, after the project review (`claude/GoodCompany_Project_Review_2026-11-16.md`). Status labels follow the project taxonomy. All entries up to v1.010 are processed in Build Spec v3.007, which the product owner accepted on 17 November 2026 (`claude/GoodCompany_MVP1_Build_Spec_v3.md`); the Codex and registries are not yet updated. This log is leading where it differs from the Build Spec or from the Claude doc "GoodCompany Escrow Protocol v1 — Architecture Proposal" (https://claude.ai/artifact/FzDsNXBC38ZSkJQ7Xuyrik).
+Decisions taken by the product owner on 16 and 17 November 2026, after the project review (`claude/GoodCompany_Project_Review_2026-11-16.md`). Status labels follow the project taxonomy. All entries up to v1.010 are processed in Build Spec v3.008, which the product owner accepted on 17 November 2026 (`claude/GoodCompany_MVP1_Build_Spec_v3.md`); the Codex and registries are not yet updated. This log is leading where it differs from the Build Spec or from the Claude doc "GoodCompany Escrow Protocol v1 — Architecture Proposal" (https://claude.ai/artifact/FzDsNXBC38ZSkJQ7Xuyrik).
 
 ## Decision Confirmed
 
@@ -148,6 +149,13 @@ The holdback is 10% of the contract value and is mandatory. It replaces the Adde
 
 **D26 — Currency.** (P11; 17 November 2026)
 One currency per contract, EUR as default, no FX conversion in MVP1. Within D5.
+
+**D27 — Corrections after the MVP1 build.** (17 November 2026)
+- The holdback is always 10% of the contract value. The final phase must be at least 10% of the contract value, so the holdback can always be withheld in full. (Applies D25; the build had reduced the holdback when the final payout was smaller.)
+- Both the client and the contractor can open a dispute on their own (Build Spec §4.3). (The build had limited this to the client.)
+- OD5: a loan application gets an administrative check before it goes to a vote. The administrator checks only completeness, required data and formal conditions, never whether the loan is desirable or how members should vote.
+- OD6–OD9 stay as built, **provisionally**, and need further product work: voters do not see identities (OD6); multi-candidate rule as a warning, not a block (OD7); sequential invoice numbers (OD8); simple interest (OD9). They are not final product decisions.
+- Completion evidence is text only in MVP1. Photo and file uploads are a planned extension.
 
 ## Awaiting the product owner's decision
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mandatoryClauses, quoteBreakdown, validateTerms, type TermsInput } from '../../shared/terms'
+import { holdbackOf, mandatoryClauses, quoteBreakdown, validateTerms, type TermsInput } from '../../shared/terms'
 
 const base = (over: Partial<TermsInput> = {}): TermsInput => ({
   warranty_period_days: 30,
@@ -28,6 +28,20 @@ describe('validateTerms (§3.4)', () => {
   it('fixes the holdback at 10%', () => {
     expect(validateTerms(base({ holdback_percentage: 15 })).join(' ')).toMatch(/fixed at 10%/)
     expect(validateTerms(base({ holdback_percentage: 10 }))).toEqual([])
+  })
+  it('requires the final phase to be at least 10% of the contract value (§3.4, D27)', () => {
+    const p = base().payment_phases
+    const nine = base({ payment_phases: [p[0], { ...p[1], percentage: 49 }, { ...p[2], percentage: 9 }] })
+    expect(validateTerms(nine).join(' ')).toMatch(/final phase must be at least 10% of the contract value.*now 9%/)
+    const ten = base({ payment_phases: [p[0], { ...p[1], percentage: 48 }, { ...p[2], percentage: 10 }] })
+    expect(validateTerms(ten)).toEqual([])
+  })
+  it('the holdback is 10% of the contract value, rounded down to the cent', () => {
+    expect(holdbackOf(1_000_000, 10)).toBe(100_000)
+    expect(holdbackOf(1_000_005, 10)).toBe(100_000)
+    // the final phase's largest-remainder amount never falls below that
+    const b = quoteBreakdown(1_000_005, { payment_phases: [{ sequence: 1, kind: 'work', percentage: 88, description: 'x', evidence_required: 'x' }, { sequence: 2, kind: 'final', percentage: 10, description: 'x', evidence_required: 'x' }], materials_budget_percentage: null }, 2)
+    expect(b.phase_amounts[1].amount).toBeGreaterThanOrEqual(holdbackOf(1_000_005, 10))
   })
   it('requires exactly one final phase, last in sequence', () => {
     const noFinal = base({ payment_phases: base().payment_phases.map((p) => ({ ...p, kind: p.kind === 'final' ? 'work' : p.kind })) })

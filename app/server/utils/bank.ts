@@ -45,26 +45,58 @@ export function sample<T>(items: T[], n: number): T[] {
   return a.slice(0, n)
 }
 
+/**
+ * Submit a loan application (§13.2 OD5, D27): it waits for an administrative check before any vote.
+ * The interest rate and the number of votes are derived now; voters are invited only after approval.
+ */
 export async function submitLoanApplication(tx: Tx, applicantId: string, b: { purpose_category: string; purpose: string; amount: number; term: number; projected_income: number | null; supplier_id: string }) {
   const settings = await getSettings(tx)
   const required = requiredVotes(b.amount, settings.required_votes_tiers)
   const audience = required * Number(settings.audience_multiplier ?? 3)
   const rate = interestRate(b.term, settings.loan_interest_rate)
-  const days = Number(settings.community_vote_duration_days ?? 14)
   const [loan] = await tx`
     insert into loan_applications (applicant_id, purpose_category, purpose, amount_requested, repayment_term_months, interest_rate,
-      projected_income, supplier_id, required_votes, audience_size, status, voting_ends_at)
+      projected_income, supplier_id, required_votes, audience_size, status)
     values (${applicantId}, ${b.purpose_category}, ${b.purpose}, ${b.amount}, ${b.term}, ${rate}, ${b.projected_income}, ${b.supplier_id},
-      ${required}, ${audience}, 'community_voting', now() + make_interval(days => ${days}))
+      ${required}, ${audience}, 'admin_check')
     returning *`
-  const pool = await eligibleVoters(tx, [applicantId, b.supplier_id])
-  const invited = sample(pool.map((p: any) => p.id as string), audience)
-  for (const voter of invited) {
-    await tx`insert into vote_invitations (loan_application_id, voter_id) values (${loan.id}, ${voter})`
-    await notify(tx, { user_id: voter, type: 'vote_invitation', title: 'You are invited to vote on a Community Bank loan', link: `/community-bank/loans/${loan.id}` })
+  const admins = await tx`select id from users where role = 'admin' and status = 'active'`
+  for (const a of admins) {
+    await notify(tx, { user_id: a.id, type: 'loan_admin_check', title: 'A loan application waits for the administrative check', link: '/admin', dedupe_key: `loan-check:${loan.id}` })
   }
-  await audit(tx, { event_type: 'loan_submitted', actor_id: applicantId, payload: { loan_id: loan.id, invited: invited.length } })
-  return { ...loan, invited: invited.length }
+  await audit(tx, { event_type: 'loan_submitted', actor_id: applicantId, payload: { loan_id: loan.id } })
+  return loan
+}
+
+/**
+ * Administrative check (OD5, D27): completeness, required data and formal conditions only — never the
+ * merits of the loan or how members should vote. Approve → the vote starts; return → no vote, with a reason.
+ */
+export async function adminCheckLoan(tx: Tx, adminId: string, id: string, decision: 'approve' | 'return', note: string) {
+  const [loan] = await tx`select * from loan_applications where id = ${id} for update`
+  if (!loan) bad('Loan not found', 404)
+  if (loan.status !== 'admin_check') bad('This application is not waiting for the administrative check')
+  const text = note.trim()
+  if (decision === 'return' && !text) bad('State the reason for returning the application')
+  if (decision === 'return') {
+    await tx`update loan_applications set status = 'returned', resolved_at = now(), admin_checked_by = ${adminId}, admin_checked_at = now(), admin_check_note = ${text} where id = ${id}`
+    await audit(tx, { event_type: 'loan_returned', actor_id: adminId, payload: { loan_id: id, reason: text } })
+    await notify(tx, { user_id: loan.applicant_id, type: 'loan', title: 'Your loan application was returned after the administrative check', body: text, link: `/community-bank/loans/${id}` })
+    return { status: 'returned' }
+  }
+  const settings = await getSettings(tx)
+  const days = Number(settings.community_vote_duration_days ?? 14)
+  await tx`update loan_applications set status = 'community_voting', voting_ends_at = now() + make_interval(days => ${days}),
+             admin_checked_by = ${adminId}, admin_checked_at = now(), admin_check_note = ${text || null} where id = ${id}`
+  const pool = await eligibleVoters(tx, [loan.applicant_id, loan.supplier_id])
+  const invited = sample(pool.map((p: any) => p.id as string), loan.audience_size)
+  for (const voter of invited) {
+    await tx`insert into vote_invitations (loan_application_id, voter_id) values (${id}, ${voter})`
+    await notify(tx, { user_id: voter, type: 'vote_invitation', title: 'You are invited to vote on a Community Bank loan', link: `/community-bank/loans/${id}` })
+  }
+  await audit(tx, { event_type: 'loan_admin_approved', actor_id: adminId, payload: { loan_id: id, invited: invited.length } })
+  await notify(tx, { user_id: loan.applicant_id, type: 'loan', title: 'Your loan application passed the administrative check and goes to a vote', link: `/community-bank/loans/${id}` })
+  return { status: 'community_voting', invited: invited.length }
 }
 
 /**

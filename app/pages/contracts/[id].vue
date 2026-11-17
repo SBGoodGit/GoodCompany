@@ -66,6 +66,7 @@ const settlement = reactive({ to_contractor: '' })
 const newMediator = ref('')
 const nestedMsg = ref('')
 const warrantyObjection = reactive({ amount: '', reason: '' })
+const contractorDispute = reactive<Record<string, string>>({})
 
 async function respond(r: any) {
   const f = respFor(r.id)
@@ -207,6 +208,13 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
       <form v-if="isContractor && r.awaiting_party === 'contractor'" class="row" style="margin-top: 0.5rem" @submit.prevent="act(() => api(`/api/contracts/${id}/completion-requests/${r.id}/information-response`, { method: 'POST', body: { body: answer[r.id] } }), 'Answer sent')">
         <input v-model="answer[r.id]" placeholder="Answer the client's question" style="flex: 1" /><button class="btn small" type="submit">Send answer</button>
       </form>
+      <details v-if="isContractor" style="margin-top: 0.5rem" data-test="contractor-dispute">
+        <summary class="small">Open a dispute on this request</summary>
+        <p class="small muted">The whole requested amount ({{ money(r.requested_amount) }}) stays frozen in escrow until you and the client settle. Other milestones and payments continue as normal. Either of you can then activate the Mediator.</p>
+        <label>Reason</label><textarea v-model="contractorDispute[r.id]" data-test="contractor-dispute-reason" />
+        <button class="btn danger small" style="margin-top: 0.5rem" data-test="contractor-dispute-submit"
+          @click="doAction('object', { completion_request_id: r.id, disputed_amount: r.requested_amount, reason: contractorDispute[r.id] }, 'Dispute opened; the requested amount stays in escrow')">Open dispute</button>
+      </details>
     </div>
 
     <!-- Repair agreements: request approval of the repair -->

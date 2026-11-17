@@ -1,6 +1,6 @@
 # GoodCompany MVP1 — Build report
 
-Built to Build Spec v3.007 and Decision Log v1.011 (`../docs/spec/`), in three Claude Code sessions on branch `mvp1` (17 November 2026). Not pushed or merged.
+Built to Build Spec v3.007 and Decision Log v1.011, corrected to v3.008 / v1.012 (D27) (`../docs/spec/`), in three Claude Code sessions on branch `mvp1` (17 November 2026). Not pushed or merged.
 
 Stack: Nuxt 3 + TypeScript (SPA, server API), Supabase run locally (Postgres, email auth), Vitest, Playwright. All balances are simulated; there is no blockchain, wallet, stablecoin, bridge or payment provider anywhere.
 
@@ -34,39 +34,39 @@ Stack: Nuxt 3 + TypeScript (SPA, server API), Supabase run locally (Postgres, em
 | Collaboration preference influencing matching | The spec says it *may*; not needed |
 | `stats_avg_response_time` | No rule in the spec; left empty |
 | Supplier payment `delivery_status` changes | Stored as `pending`; no flow in the spec sets it |
-| Funding timeout, workspace reactivation, admin gate before a loan vote | Open product decisions OD2, OD4, OD5; nothing assumed |
+| Funding timeout, workspace reactivation | Open product decisions OD2, OD4; nothing assumed |
 | Hosted deployment | Not requested; runs locally |
 
 ## 3. Choices made where the spec was open
 
-All 81 choices, with location and reasoning, are in `BUILD_NOTES.md`. The ones that most affect behaviour:
+All 85 choices, with location and reasoning, are in `BUILD_NOTES.md`. The ones that most affect behaviour:
 
 - **Architecture** (1–8): SPA + server API; RLS deny-all for the public roles with all authorisation in the server; restricted `gc_app` role; local Supabase on ports 553xx.
 - **Identity and signatures** (9–13): verified email only; step-up = password re-entry giving a single-use 5-minute grant; every signature is an attestation tied to that grant.
 - **Marketplace** (14–20): budget not a search filter (would leak it); one workspace per contractor per job; awarded jobs leave search.
 - **Workspace** (21–34): percentages in basis points; one largest-remainder split over fee, materials and phases; admin-assigned default Mediator; **multi-candidate rule as a soft warning with logged override (OD7)**.
-- **Ledger** (37–41, 42–48): pure rules + locked persistence; simulated money conserved; **holdback withheld = min(10%, final payout)** so the contractor never tops up; **final request only after all other milestones are paid**; mutual settlement fee = 2% of everything paid out (none if nothing was).
-- **Disputes** (49–56): **only the client signs `object`** (contractor protected by triggers and Mediator activation); objection in part releases the undisputed part at once; settle = split or withdrawal; triggers are signature-less ledger operations that move no money.
+- **Ledger** (37–41, 42–48): pure rules + locked persistence; simulated money conserved; **holdback always the full 10%; the final phase must be ≥ 10% (correction 82)**; **final request only after all other milestones are paid**; mutual settlement fee = 2% of everything paid out (none if nothing was).
+- **Disputes** (49–56): **either party signs `object`; the contractor disputes a whole open request of their own (correction 83)**; objection in part releases the undisputed part at once; settle = split or withdrawal; triggers are signature-less ledger operations that move no money.
 - **Nested contracts** (57): signable once the first contract is completed or its final delivery was part-paid.
 - **Visibility** (58, 77): client never receives supplier payment amounts, supplier ledger entries or a balance from which they follow — but after the final payout the total supplier spend is derivable from P21's labour-income rule (recorded limitation).
 - **Invoices** (61–62): 100% of base quote + Change Orders; **sequential reference `GC-INV-<year>-<n>` (OD8)**.
 - **Reputation** (63–65): value-weighted average × on-time factor; no public individual ratings during the Rookie Stage.
-- **Community Bank** (66–75): **no admin gate before voting (OD5)**; voters don't see identities (OD6); **simple pro-rata interest (OD9)**; admin seed money for reserves; illustrative health score.
+- **Community Bank** (66–75): **administrative check before voting (OD5, correction 84)**; voters don't see identities (OD6); **simple pro-rata interest (OD9)**; admin seed money for reserves; illustrative health score.
 - **Jobs** (79–81): 5-minute scheduler with per-job intervals; dedupe keys; added escrow action expiry.
 
 ## 4. Test results
 
 Run on 17 November 2026 against the local stack:
 
-- **Vitest: 75 tests, 6 files — all pass.** Money and rounding; terms validation; budget hiding; canonical hashing; database guarantees (append-only, RLS); **32 ledger tests covering every action and its conditions, including the §7.1 worked example as an exact assertion (contract 10,000.00 → contractor 7,200.00, suppliers 2,600.00, fee 200.00, escrow empty)**; reviews, reputation, warranty metrics, interest, vote tiers, fee batch split, Safety Reserve threshold, health score.
-- **Playwright: 12 tests, 5 files — all pass.**
+- **Vitest: 82 tests, 6 files — all pass** (after the corrections). Money and rounding; terms validation; budget hiding; canonical hashing; database guarantees (append-only, RLS); **32 ledger tests covering every action and its conditions, including the §7.1 worked example as an exact assertion (contract 10,000.00 → contractor 7,200.00, suppliers 2,600.00, fee 200.00, escrow empty)**; reviews, reputation, warranty metrics, interest, vote tiers, fee batch split, Safety Reserve threshold, health score.
+- **Playwright: 13 tests, 5 files — all pass** (after the corrections).
   - Sign-up requires a verified email.
   - Job → workspace (five stages) → both sign → contract awaiting funding, rival candidate closed out.
   - **Path 1 through the UI: job → workspace → signing → funding → advance and supplier payments → completion → approval → holdback tranches, with the §7.1 numbers.**
   - **Path 2 through the UI: objection → Mediator activation → advice (refused before notice and before 48 h) → settlement.**
   - Trigger (b) silence: case opened, Mediator active, no payout, idempotent.
   - Change Orders (positive, negative, rejection); repair agreement + nested contract; mutual settlement without fee.
-  - Final evaluation, invoices, fee statement, reviews and Rookie Stage; fee batch and full loan cycle; system jobs (inactivity, Change Order expiry, reconciliation, health score); dashboard deadlines, notifications, admin settings with fixed holdback.
+  - Final evaluation, invoices, fee statement, reviews and Rookie Stage; fee batch and full loan cycle including the administrative check; OD5 return-with-reason and approve through the admin page; system jobs (inactivity, Change Order expiry, reconciliation, health score); dashboard deadlines, notifications, admin settings with fixed holdback.
 - Production build (`nuxt build`) succeeds.
 
 Tests that need time to pass (warranty tranches, 48-hour notice, 14 days of silence, inactivity, expiry) move the relevant timestamps back in the test database; the application always uses the real clock.

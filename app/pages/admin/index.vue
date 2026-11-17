@@ -38,6 +38,11 @@ const assignWs = () => run(() => api(`/api/admin/workspaces/${assign.workspace_i
 const assignContract = () => run(() => api(`/api/admin/contracts/${contractAssign.contract_id}/mediator`, { method: 'POST', body: { mediator_id: contractAssign.mediator_id } }), 'Mediator assigned to contract')
 const credit = () => run(() => api('/api/admin/simulated-balances', { method: 'POST', body: balance }), 'Simulated balance added')
 const seedReserve = () => run(() => api('/api/admin/reserves/seed', { method: 'POST', body: seed }), 'Simulated seed added to the reserve')
+const checkNote = reactive<Record<string, string>>({})
+const checkLoan = (id: string, decision: 'approve' | 'return') => run(
+  () => api(`/api/admin/loans/${id}/check`, { method: 'POST', body: { decision, note: checkNote[id] ?? '' } }),
+  decision === 'approve' ? 'Application approved; the vote has started' : 'Application returned to the applicant')
+const pendingLoans = computed(() => loans.value.filter((l) => l.status === 'admin_check'))
 const markDefault = (id: string) => { if (confirm('Mark this loan as defaulted?')) run(() => api(`/api/admin/loans/${id}/default`, { method: 'POST' }), 'Loan marked defaulted') }
 const runJob = (job: string) => run(async () => {
   const r: any = await api('/api/admin/system/run-job', { method: 'POST', body: { job } })
@@ -111,6 +116,22 @@ const runJob = (job: string) => run(async () => {
         <label for="r-amount">Amount</label><input id="r-amount" v-model="seed.amount" inputmode="decimal" required />
         <button class="btn" type="submit" style="margin-top: 0.5rem">Add to reserve</button>
       </form>
+    </div>
+
+    <div class="card small" data-test="loan-checks">
+      <h3>Loan applications: administrative check</h3>
+      <p class="muted">Check completeness, required data and formal conditions only (OD5). Never judge whether the loan is desirable or how members should vote. Returning requires a reason.</p>
+      <p v-if="!pendingLoans.length" class="muted">No applications waiting.</p>
+      <div v-for="l in pendingLoans" :key="l.id" class="card" :data-test="`loan-check-${l.id}`">
+        <div><b>{{ l.purpose_category }}</b> · {{ fmtMoney(l.amount_requested) }} · {{ l.repayment_term_months }} months at {{ l.interest_rate }}% · applicant {{ l.applicant }} · supplier {{ l.supplier }}</div>
+        <div>{{ l.purpose }}</div>
+        <div v-if="l.projected_income" class="muted">Projected income: {{ fmtMoney(l.projected_income) }}</div>
+        <label :for="`note-${l.id}`">Reason or note (required to return)</label><input :id="`note-${l.id}`" v-model="checkNote[l.id]" data-test="loan-check-note" />
+        <div class="row" style="margin-top: 0.5rem">
+          <button class="btn small" data-test="loan-check-approve" @click="checkLoan(l.id, 'approve')">Approve for voting</button>
+          <button class="btn secondary small" data-test="loan-check-return" @click="checkLoan(l.id, 'return')">Return to applicant</button>
+        </div>
+      </div>
     </div>
 
     <div class="card small">

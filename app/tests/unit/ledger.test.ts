@@ -43,7 +43,7 @@ function state(over: { warranty?: number; materials?: number; milestones?: [stri
 
 /** Apply with the required signers; keeps a running total of fees moved to the collect-wallet. */
 function run(s: LedgerState, type: Action['type'], params: Record<string, any> = {}, opts: { actor?: string; signers?: string[]; now?: Date } = {}) {
-  const action: Action = { type, params, actor: opts.actor ?? null }
+  const action: Action = { type, params, actor: opts.actor ?? (type === 'object' ? CLIENT : null) }
   const signers = opts.signers ?? requiredSigners(s, action)
   const r = applyAction(s, action, signers, ctx(opts.now))
   ;(r.state as any).feeTotal = ((s as any).feeTotal ?? 0) + r.state.feeCollection.reduce((x, f) => x + f.amount, 0)
@@ -220,6 +220,12 @@ describe('Change Orders (§4.4)', () => {
     s.changeOrders = [co({ milestone_changes: [{ milestone_id: 'm3', amount: 340_000 }] })]
     expect(() => run(s, 'change_order', { change_order_id: 'co' })).toThrow(/must equal the new contract value/)
   })
+  it('keeps the final phase at least the 10% holdback (D27)', () => {
+    const s = go(state(), 'fund')
+    // +50,000 contract value → holdback 105,000; moving the final phase down to 99,000 is refused
+    s.changeOrders.push(co({ milestone_changes: [{ milestone_id: 'm2', amount: 530_000 }, { milestone_id: 'm3', amount: 99_000 }] }))
+    expect(() => run(s, 'change_order', { change_order_id: 'co' })).toThrow(/final phase must stay at least 10%/)
+  })
   it('is impossible after the final completion request and after expiry', () => {
     const fin = toFinalRequest(); fin.changeOrders.push(co())
     expect(() => run(fin, 'change_order', { change_order_id: 'co' })).toThrow(/after the final completion request/)
@@ -352,6 +358,60 @@ describe('Path 2: objection, settlement, Mediator (§4.3)', () => {
     expect(s.balances).toEqual(before)
     const esc = run(s, 'escalate', { dispute_id: s.disputes[0].id }, { actor: CONTRACTOR })
     expect(esc.state.balances).toEqual(before)
+  })
+})
+
+describe('holdback always 10% (§3.4, D25, D27)', () => {
+  it('withholds the full 10% even when the final phase is exactly 10% and no materials are left', () => {
+    // 10,000.00: advance 1,000, work 6,800, final 1,000 (10%), materials 1,000 fully spent, fee 200
+    let s = go(state({ materials: 100_000, milestones: [['advance', 100_000], ['work', 680_000], ['final', 100_000]] }), 'fund')
+    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 100_000 }, { actor: CONTRACTOR })
+    s = go(s, 'claim_advance', { milestone_id: 'm1' })
+    s = go(s, 'request_completion', { milestone_id: 'm2', evidence_text: 'x' })
+    s = go(s, 'approve', { completion_request_id: openRequest(s).id })
+    s = go(s, 'request_completion', { milestone_id: 'm3', evidence_text: 'done' })
+    expect(openRequest(s).requested_amount).toBe(0) // 1,000 final − 1,000 holdback
+    s = go(s, 'approve', { completion_request_id: openRequest(s).id })
+    expect(s.account!.holdback_amount).toBe(100_000)
+    expect(s.account!.holdback_tranches.reduce((x, t) => x + t.amount, 0)).toBe(100_000)
+    expect(escrowBalance(s.account!)).toBe(100_000)
+  })
+})
+
+describe('contractor opens a dispute (§4.3 stage 1a, D27)', () => {
+  it('the contractor alone signs object on their open request; the whole requested amount is frozen', () => {
+    let s = go(state(), 'fund')
+    s = go(s, 'request_completion', { milestone_id: 'm2', evidence_text: 'x' })
+    const rid = openRequest(s).id
+    const a: Action = { type: 'object', params: {}, actor: CONTRACTOR }
+    expect(requiredSigners(s, a)).toEqual([CONTRACTOR])
+    expect(() => run(s, 'object', { completion_request_id: rid, disputed_amount: 280_000 }, { actor: CONTRACTOR })).toThrow(/reason/)
+    expect(() => run(s, 'object', { completion_request_id: rid, disputed_amount: 100_000, reason: 'Client does not respond' }, { actor: CONTRACTOR })).toThrow(/whole requested amount/)
+    const r = run(s, 'object', { completion_request_id: rid, disputed_amount: 280_000, reason: 'Client does not respond' }, { actor: CONTRACTOR })
+    s = r.state
+    expect(s.disputes[0]).toMatchObject({ opened_by: 'contractor', scope: 'request', status: 'between_parties', disputed_amount: 280_000 })
+    expect(s.account!.disputed_amount).toBe(280_000)
+    expect(s.balances[CONTRACTOR]).toBe(0)
+    expect(r.notices[0].user_id).toBe(CLIENT)
+    // Undisputed amounts continue on Path 1: the advance can still be claimed.
+    s = go(s, 'claim_advance', { milestone_id: 'm1' })
+    expect(s.balances[CONTRACTOR]).toBe(100_000)
+    // Only settle by both releases the disputed amount.
+    s = go(s, 'settle', { dispute_id: s.disputes[0].id, to_contractor: 250_000, to_client: 30_000 })
+    expect(s.balances[CONTRACTOR]).toBe(350_000)
+    expect(s.account!.disputed_amount).toBe(0)
+  })
+  it('a contractor needs an open request; a mediator or outsider cannot object', () => {
+    const s = go(state(), 'fund')
+    expect(() => run(s, 'object', { disputed_amount: 1_000, reason: 'x' }, { actor: CONTRACTOR })).toThrow(/open completion requests/)
+    expect(() => run(s, 'object', { disputed_amount: 1_000, reason: 'x' }, { actor: MEDIATOR })).toThrow(/contract party/)
+  })
+  it('a client still objects alone, and the client signature is not enough for a contractor objection', () => {
+    let s = go(state(), 'fund')
+    s = go(s, 'request_completion', { milestone_id: 'm2', evidence_text: 'x' })
+    const params = { completion_request_id: openRequest(s).id, disputed_amount: 280_000, reason: 'x' }
+    expect(() => run(s, 'object', params, { actor: CONTRACTOR, signers: [CLIENT] })).toThrow()
+    expect(go(s, 'object', params, { actor: CLIENT }).disputes[0].opened_by).toBe('client')
   })
 })
 

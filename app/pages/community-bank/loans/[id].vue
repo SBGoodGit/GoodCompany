@@ -19,9 +19,16 @@ const l = computed(() => d.value?.loan)
       <div>{{ l.purpose }}</div>
       <div>Amount <b>{{ fmtMoney(l.amount_requested) }}</b> · term {{ l.repayment_term_months }} months · interest {{ l.interest_rate }}%</div>
       <div v-if="l.projected_income">Projected income (not validated): {{ fmtMoney(l.projected_income) }}</div>
-      <div>Votes needed: {{ l.required_votes }} (≥ 60% for) · voting until {{ l.voting_ends_at?.slice(0, 10) }}</div>
+      <div>Votes needed: {{ l.required_votes }} (≥ 60% for)<template v-if="l.voting_ends_at"> · voting until {{ l.voting_ends_at.slice(0, 10) }}</template></div>
       <div v-if="d.tally.for_votes !== undefined">Votes: {{ d.tally.votes }} ({{ d.tally.for_votes }} for)</div>
       <div v-else>Votes so far: {{ d.tally.votes }}</div>
+    </div>
+    <div v-if="l.status === 'admin_check'" class="card small info" data-test="admin-check-pending">
+      Waiting for the administrative check. An administrator checks completeness, required data and formal conditions only — not whether the loan is a good idea. The vote starts after approval.
+    </div>
+    <div v-if="l.status === 'returned'" class="card small" data-test="admin-check-returned">
+      <b>Returned after the administrative check.</b> No vote took place. Reason: {{ l.admin_check_note }}
+      <div class="muted">You can submit a new application with the missing information.</div>
     </div>
     <div v-if="d.role === 'voter' && l.status === 'community_voting'" class="card small">
       <template v-if="d.my_vote">You voted <b>{{ d.my_vote }}</b>.</template>

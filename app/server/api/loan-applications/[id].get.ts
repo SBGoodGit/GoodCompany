@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
       id: l.id, purpose_category: l.purpose_category, purpose: l.purpose, amount_requested: l.amount_requested, repayment_term_months: l.repayment_term_months,
       interest_rate: l.interest_rate, projected_income: l.projected_income, required_votes: l.required_votes, audience_size: l.audience_size,
       status: l.status, voting_ends_at: l.voting_ends_at,
-      ...(isApplicant ? { principal_outstanding: l.principal_outstanding, interest_paid: l.interest_paid, amount_repaid: l.amount_repaid, activated_at: l.activated_at } : {}),
+      ...(isApplicant ? { principal_outstanding: l.principal_outstanding, interest_paid: l.interest_paid, amount_repaid: l.amount_repaid, activated_at: l.activated_at, admin_check_note: l.admin_check_note } : {}),
     },
     invitation: inv ?? null, my_vote: myVote?.choice ?? null,
     tally: isApplicant || resolved ? tally : { votes: tally.votes },

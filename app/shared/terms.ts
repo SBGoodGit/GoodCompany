@@ -31,6 +31,10 @@ export interface TermsRules {
 
 export const DEFAULT_TERMS_RULES: TermsRules = { feePercentage: 2, warrantyOptions: [0, 15, 30, 90], holdbackPercentage: 10 }
 
+/** The holdback on a contract value, in cents. Rounded down, so a final phase of at least the holdback
+ *  percentage (whose amount the largest-remainder split never rounds below the floor) always covers it. */
+export const holdbackOf = (value: number, pct: number) => Math.floor((value * pct) / 100)
+
 /** Validate a terms version. Returns a list of human-readable errors (empty = valid). */
 export function validateTerms(t: TermsInput, rules: TermsRules = DEFAULT_TERMS_RULES): string[] {
   const errors: string[] = []
@@ -48,6 +52,10 @@ export function validateTerms(t: TermsInput, rules: TermsRules = DEFAULT_TERMS_R
   const finals = phases.filter((p) => p.kind === 'final')
   if (finals.length !== 1) errors.push('Exactly one phase must be of kind "final"')
   else if (phases[phases.length - 1].kind !== 'final') errors.push('The final phase must be last in sequence')
+  else if (!(finals[0].percentage >= rules.holdbackPercentage)) {
+    // §3.4, D27: the holdback is always withheld in full from the final payout.
+    errors.push(`The final phase must be at least ${rules.holdbackPercentage}% of the contract value, so the ${rules.holdbackPercentage}% holdback can be withheld in full (now ${finals[0].percentage}%)`)
+  }
   phases.forEach((p, i) => {
     if (p.sequence !== i + 1) errors.push('Phase sequence numbers must run 1, 2, 3, … without gaps')
     if (!['advance', 'work', 'final'].includes(p.kind)) errors.push(`Phase ${p.sequence}: kind must be advance, work or final`)

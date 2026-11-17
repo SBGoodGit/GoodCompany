@@ -7,6 +7,7 @@ import {
   type Account, type Action, type ApplyContext, type ApplyResult, type CompletionRequest, type Dispute,
   type LedgerEntryDraft, type LedgerState, type Milestone, type Tranche,
 } from './types'
+import { holdbackOf } from '../../shared/terms'
 
 const DAY = 86_400_000
 
@@ -40,8 +41,10 @@ export function requiredSigners(state: LedgerState, action: Action): string[] {
   switch (action.type) {
     case 'fund':
     case 'approve':
-    case 'object':
       return [client]
+    case 'object': // either party opens a dispute on its own (§4.3 stage 1a, D27)
+      if (action.actor !== client && action.actor !== contractor) reject('Only a contract party can object')
+      return [action.actor]
     case 'claim_advance':
     case 'pay_supplier':
     case 'request_completion':
@@ -126,10 +129,12 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
   const request = (id: string): CompletionRequest => s.requests.find((r) => r.id === id) ?? reject('Completion request not found')
   const openDisputes = () => s.disputes.filter((d) => ['between_parties', 'mediator_active', 'advice_issued'].includes(d.status))
   const syncMediatorFlag = () => { if (s.account) s.account.mediator_active = openDisputes().some((d) => d.mediator_activated_at) }
+  /** Always the full 10% holdback (§3.4, D25, D27); the final phase is at least that large. */
   const holdbackWithheld = () => {
     const a = acc()
     if (c.warranty_period_days === 0) return 0 // 0-day warranty: 100% at final approval (§7.2, O26)
-    return Math.min(a.holdback_amount, finalMilestone().amount + unspentMaterials(a))
+    if (a.holdback_amount > finalMilestone().amount + unspentMaterials(a)) reject('Internal: the final phase is smaller than the holdback')
+    return a.holdback_amount
   }
   /** What approving a request would release to the contractor. */
   const requestAmount = (r: CompletionRequest) => {
@@ -201,7 +206,7 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
         contract_id: c.id, currency: c.currency, principal_total: deposit, client_surplus: 0, client_surplus_settled: 0,
         fee_rate: ctx.config.platform_fee_rate, fee_reserved: c.fee_amount, fee_final: 0, fee_transferred: 0, fee_kept: 0,
         materials_budget: c.materials_budget_amount, paid_to_suppliers: 0, materials_released: 0, paid_to_contractor: 0,
-        refunded_to_client: 0, holdback_amount: Math.round((deposit * c.holdback_percentage) / 100), warranty_start_date: null,
+        refunded_to_client: 0, holdback_amount: holdbackOf(deposit, c.holdback_percentage), warranty_start_date: null,
         holdback_tranches: [], disputed_amount: 0, repair_held: 0, mediator_id: c.mediator_id, mediator_active: false,
         snapshot_hash: c.snapshot_hash,
       }
@@ -346,6 +351,11 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
       if (sum + newMaterials + newFee !== newValue) {
         reject(`Milestones (${sum}) + materials budget (${newMaterials}) + fee (${newFee}) must equal the new contract value (${newValue})`)
       }
+      // D27: the final phase stays at least the 10% holdback, so the holdback can always be withheld in full.
+      const newHoldback = holdbackOf(newValue, c.holdback_percentage)
+      if (amounts.get(finalMilestone().id)! < newHoldback) {
+        reject(`The final phase must stay at least ${c.holdback_percentage}% of the contract value (${money(newHoldback)}), so the holdback can be withheld in full`)
+      }
       if (delta > 0) {
         if ((s.balances[c.client_id] ?? 0) < delta) reject("The client's simulated balance is too low for the extra deposit")
         s.balances[c.client_id] -= delta
@@ -363,7 +373,7 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
       }
       a.materials_budget = newMaterials
       a.fee_reserved = newFee
-      a.holdback_amount = Math.round((newValue * c.holdback_percentage) / 100)
+      a.holdback_amount = holdbackOf(newValue, c.holdback_percentage)
       co.status = 'effective'
       record('change_order', { amount_delta: delta, contract_value: newValue, fee_reserved: newFee })
       summary = delta > 0
@@ -421,14 +431,19 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
       if (!reason) reject('State the reason for the objection')
       const D = amountParam('disputed_amount', 1)
       if (escrowBalance(a) === 0) reject('The escrow is empty')
+      const by = party(action.actor)!
       const id = ctx.newId()
       let scope: Dispute['scope']
+      if (by === 'contractor' && !p.completion_request_id) reject('The contractor opens a dispute on one of their open completion requests')
       if (p.completion_request_id) {
         const r = request(p.completion_request_id)
         if (r.status !== 'open') reject('This request is not open')
         if (openDisputes().some((d) => d.completion_request_id === r.id)) reject('A dispute is already open on this request')
         const R = requestAmount(r)
         if (D > R) reject(`The disputed amount cannot exceed the requested ${R}`)
+        // D27: the contractor disputes the client's handling of the request. Nothing of it was approved, so
+        // there is no undisputed part to release: the whole requested amount is the disputed amount.
+        if (by === 'contractor' && D !== R) reject(`The contractor disputes the whole requested amount (${money(R)}); other amounts continue on Path 1`)
         r.status = 'objected'
         r.last_party_action_at = nowIso
         const m = milestone(r.milestone_id)
@@ -461,7 +476,7 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
         scope = 'warranty'
       }
       s.disputes.push({
-        id, completion_request_id: p.completion_request_id ?? null, opened_by: 'client', trigger: 'objection', scope,
+        id, completion_request_id: p.completion_request_id ?? null, opened_by: by, trigger: 'objection', scope,
         reason, reason_hash: ctx.hash(reason), disputed_amount: D, status: 'between_parties',
         mediator_activated_at: null, mediator_due_at: null,
       })
@@ -469,7 +484,9 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
       summary = scope === 'request_partial'
         ? `Object in part: ${money(D)} stays frozen in escrow; the rest of the request is released now.`
         : `Object: ${money(D)} stays frozen in escrow until the parties settle. Undisputed amounts are not affected.`
-      notices.push({ user_id: c.contractor_id, title: 'The client objected', body: 'Try to settle together first. Either of you can activate the Mediator.' })
+      notices.push(by === 'client'
+        ? { user_id: c.contractor_id, title: 'The client objected', body: 'Try to settle together first. Either of you can activate the Mediator.' }
+        : { user_id: c.client_id, title: 'The contractor opened a dispute', body: `${money(D)} of the requested amount stays frozen in escrow. Try to settle together first. Either of you can activate the Mediator.` })
       break
     }
     case 'settle': {

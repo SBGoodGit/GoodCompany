@@ -8,10 +8,11 @@
 <!-- v3.005 (17-11-2026): Feeregel vereenvoudigd: 2% bevroren bij storting en in één keer overgemaakt bij afronding van de opdracht -->
 <!-- v3.006 (17-11-2026): O24 (reactietermijn alleen voor volledige oplevering) en O26 (holdback ook bij 0 dagen garantie) verwerkt; O25 uitgesteld -->
 <!-- v3.007 (17-11-2026): Geaccepteerd door de product owner -->
+<!-- v3.008 (17-11-2026): Correcties na de bouw: eindfase minimaal 10%, OD5 administratieve controle, OD6–OD9 voorlopig, foto-uploads als geplande uitbreiding -->
 
 *Marketplace · GoodTrade · Community Bank*
 
-**Status of this document: v3.007, accepted by the product owner on 17 November 2026. This is the single buildable specification for MVP1. O25 (client reputation score) is deferred and does not block the build.**
+**Status of this document: v3.008, accepted by the product owner on 17 November 2026, with corrections after the MVP1 build (D27). This is the single buildable specification for MVP1. O25 (client reputation score) is deferred and does not block the build.**
 
 ---
 
@@ -264,7 +265,7 @@ There is no "candidate selected" status. Selection is implied by offering the co
 |---|---|---|---|
 | warranty_period_days | enum[0, 15, 30, 90], default 30 | With 0 days the holdback is released once both parties have agreed the final payment (§7.2) | Confirmed (Addendum); Decision Confirmed (O26) |
 | holdback_percentage | fixed 10 | Mandatory. No longer a choice between 5, 10 and 15 | Decision Confirmed (P9, D25). Replaces the Addendum's choice |
-| payment_phases | array[{sequence, kind, percentage, description, evidence_required}] | Phases, `materials_budget_percentage` and the 2% fee together sum to 100% of the contract value. Phase amounts are what the contractor receives; the fee is not deducted from them again. `kind`: enum[advance, work, final]. Exactly one `final`, last in sequence. There is no materials milestone | `kind`: Decision Confirmed (P10, D12); split Confirmed (Derived) from D10 |
+| payment_phases | array[{sequence, kind, percentage, description, evidence_required}] | Phases, `materials_budget_percentage` and the 2% fee together sum to 100% of the contract value. Phase amounts are what the contractor receives. `kind`: enum[advance, work, final]. Exactly one `final`, last in sequence, and **at least 10% of the contract value**, so the mandatory holdback can always be withheld in full. There is no materials milestone | Decision Confirmed (P10, D12, D25, D27) |
 | materials_budget_percentage | decimal, nullable | share of the contract value reserved for supplier payments, proposed by the contractor and approved by the client's signature on the terms. Changes only through a Change Order | Decision Confirmed (D12; Sander's direction of 16 November: percentage set in the quote and payment terms) |
 | execution_period_days | int | agreed execution period, accepted by both parties before signing. Also sets the Change Order expiry (§4.4) | Decision Confirmed (P14) |
 | mediator_id | ref → User(role=mediator) | assigned by an admin; both parties accept the mediator by accepting the terms | Confirmed (Derived), Protocol v1 "Parties and keys"; assignment by admin Decision Confirmed (P15) |
@@ -336,7 +337,7 @@ A quote has no expiry of its own. It stays valid while its workspace is active (
 | Field | Type | Notes | Status |
 |---|---|---|---|
 | contract_id, milestone_id | ref | one open request per milestone | Decision Confirmed (D8) |
-| evidence | array[file ref], text | a request is formal only once the agreed evidence is supplied | Decision Confirmed (D14) |
+| evidence | text in MVP1; `array[file ref]` reserved | a request is formal only once the agreed evidence is supplied. Photo and file uploads are a planned extension (D27) | Decision Confirmed (D14, D27) |
 | evidence_hash | string | recorded in the ledger | Confirmed (Derived) |
 | requested_at | timestamp | starts the response window and the payment deadline | Decision Confirmed (D8) |
 | response_due_at | timestamp | `requested_at + completion_response_days`; final delivery only | Decision Confirmed (D8, P2, O24) |
@@ -971,11 +972,11 @@ All proposals are decided (17 November 2026).
 | OD1 | Should stale open jobs auto-expire? | v2 10.1 |
 | OD2 | Funding timeout after signing; what happens to closed sibling workspaces if the client never funds | New in v3 |
 | OD4 | Can an expired workspace be reactivated? Codex decision 10.6 implies it; v2 §3.2 closes it | New in v3 |
-| OD5 | Admin or compliance gate before a loan goes to vote | v2 |
-| OD6 | What voters see of a business plan | v2 |
-| OD7 | Multi-candidate threshold: hard block or logged override; what non-selected candidates learn | v2 |
-| OD8 | Invoice numbering: sequential per user or UUID | v2 10.16 |
-| OD9 | Loan repayment form: annuity or linear | v2 |
+| OD5 | Loan applications get an administrative check before voting: completeness, required data and formal conditions only, never the merits | **Decided (D27)** |
+| OD6 | Provisional: voters do not see the identities of applicant and supplier. Further product work required | Provisional (D27) |
+| OD7 | Provisional: multi-candidate threshold as a warning with logged override, not a block. Further product work required | Provisional (D27) |
+| OD8 | Provisional: sequential invoice numbers. Further product work required | Provisional (D27) |
+| OD9 | Provisional: simple interest, pro rata to time. Further product work required | Provisional (D27) |
 | OD10 | Content of the technical-intake question library per category | Codex |
 
 Also open in the log, not blocking: O9 (refinement of the mediator triggers and the cost arrangement).
@@ -1084,7 +1085,7 @@ Non-binding; carried over from v2 §12 with the November changes.
 | Stage | Items |
 |---|---|
 | Next decision | Whether to take the interim Cardano route (D15) or wait for the Midnight dependencies |
-| MVP2 | Dispute Center self-service layer and AI suggestions; automated missed-payment detection; Innovation Fund slots; Plugin Marketplace; Project Execution module; bookkeeping connector; applicant-flow throttling |
+| MVP2 | Dispute Center self-service layer and AI suggestions; automated missed-payment detection; Innovation Fund slots; Plugin Marketplace; Project Execution module; bookkeeping connector; applicant-flow throttling; photo and file uploads as completion evidence |
 | MVP3 | Compliance export tooling; AVI with DigiD or EU identity as source; badges; community roadmap voting |
 | Target architecture | Shielded escrow on Midnight; shielded materials account with payments to verified suppliers; Community Bank on Cardano |
 | Later | Additional bank products by community vote; GoodTrade Lite as a separate pitch tool; PING stake pool |

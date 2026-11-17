@@ -103,8 +103,9 @@ test('part 10: fee batch to the reserves, loan voted, released to the supplier a
     const loan = await call(a.token, 'POST', '/api/loan-applications', {
       purpose_category: 'equipment', purpose: 'A table saw', amount_requested: '1000', repayment_term_months: 18, supplier_email: supplier.email, projected_income: '5000',
     })
-    expect(loan.status).toBe('community_voting')
+    expect(loan.status).toBe('admin_check') // OD5: administrative check before any vote (D27)
     expect(Number(loan.interest_rate)).toBe(4.25)
+    expect((await call(admin, 'POST', `/api/admin/loans/${loan.id}/check`, { decision: 'approve' })).status).toBe('community_voting')
     // The random sample may pick any eligible member; point the single invitation at our voter
     await sql`delete from vote_invitations where loan_application_id = ${loan.id}`
     await sql`insert into vote_invitations (loan_application_id, voter_id) values (${loan.id}, ${voter.id})`
@@ -218,4 +219,58 @@ test('part 11: dashboard deadlines, notifications page, admin settings with the 
   await admin.getByTestId('save-silence_days').click()
   await expect(admin.getByTestId('notice')).toHaveText('Saved silence_days')
   await setSetting('silence_days', 14)
+})
+
+test('OD5: administrative check before a loan vote — return with a reason, or approve to start voting', async ({ browser }) => {
+  const sql = superuserDb()
+  try {
+    await setSetting('required_votes_tiers', [1, 1, 1, 1])
+    await setSetting('audience_multiplier', 1)
+    const applicant = await createUser('Olga Check', 'contractor')
+    const supplier = await createUser('Check Supplies', 'contractor')
+    const a = await tokenFor(applicant)
+    const apply = (purpose: string) => call(a, 'POST', '/api/loan-applications', {
+      purpose_category: 'equipment', purpose, amount_requested: '1000', repayment_term_months: 12, supplier_email: supplier.email,
+    })
+    const incomplete = await apply('Machine')
+    const complete = await apply('A planer with quote from the supplier attached')
+    expect([incomplete.status, complete.status]).toEqual(['admin_check', 'admin_check'])
+    // No invitations and no votes before the check
+    const [inv] = await sql`select count(*)::int as n from vote_invitations where loan_application_id in (${incomplete.id}, ${complete.id})`
+    expect(inv.n).toBe(0)
+
+    // The admin checks in the admin page
+    const adminPage = await pageFor(browser, { email: process.env.SEED_ADMIN_EMAIL!, password: process.env.SEED_ADMIN_PASSWORD! })
+    await adminPage.goto('/admin')
+    const first = adminPage.getByTestId(`loan-check-${incomplete.id}`)
+    await first.getByTestId('loan-check-return').click()
+    await expect(adminPage.getByTestId('error')).toContainText('State the reason')
+    await first.getByTestId('loan-check-note').fill('The purpose is incomplete: describe the machine and add the supplier quote')
+    await first.getByTestId('loan-check-return').click()
+    await expect(adminPage.getByTestId('notice')).toContainText('returned')
+    await adminPage.getByTestId(`loan-check-${complete.id}`).getByTestId('loan-check-approve').click()
+    await expect(adminPage.getByTestId('notice')).toContainText('vote has started')
+    await expect(adminPage.getByTestId(`loan-check-${complete.id}`)).toHaveCount(0)
+
+    const [ret] = await sql`select status, admin_check_note, voting_ends_at from loan_applications where id = ${incomplete.id}`
+    expect(ret).toMatchObject({ status: 'returned', voting_ends_at: null })
+    const [ok] = await sql`select status, voting_ends_at, admin_checked_by from loan_applications where id = ${complete.id}`
+    expect(ok.status).toBe('community_voting')
+    expect(ok.voting_ends_at).not.toBeNull()
+    expect(ok.admin_checked_by).toBeTruthy()
+    // A checked application cannot be checked again
+    await expect(call(await adminToken(), 'POST', `/api/admin/loans/${incomplete.id}/check`, { decision: 'approve' })).rejects.toThrow(/not waiting/)
+
+    // The applicant sees the reason; no vote took place
+    const page = await pageFor(browser, applicant)
+    await page.goto(`/community-bank/loans/${incomplete.id}`)
+    await expect(page.getByTestId('loan-status')).toHaveText('returned')
+    await expect(page.getByTestId('admin-check-returned')).toContainText('describe the machine')
+    await page.goto(`/community-bank/loans/${complete.id}`)
+    await expect(page.getByTestId('loan-status')).toHaveText('community voting')
+  } finally {
+    await setSetting('required_votes_tiers', [50, 100, 250, 500])
+    await setSetting('audience_multiplier', 3)
+    await sql.end()
+  }
 })
