@@ -25,5 +25,15 @@ const mediator = await ensureUser('mediator@goodcompany.test', env.SEED_USER_PAS
 await sql`update public.app_settings set value = ${sql.json(mediator)} where key = 'default_mediator_id' and value = 'null'::jsonb`
 await ensureUser('client@goodcompany.test', env.SEED_USER_PASSWORD, 'Clara Client', 'client')
 await ensureUser('contractor@goodcompany.test', env.SEED_USER_PASSWORD, 'Conor Contractor', 'contractor', ['carpentry', 'renovation'])
+await ensureUser('supplier@goodcompany.test', env.SEED_USER_PASSWORD, 'Sam Supplier', 'contractor')
+
+// Simulated balance (§2.2): demonstration money for the demo client, created by this seed function.
+const [client] = await sql`select id from public.users where email = 'client@goodcompany.test'`
+const [has] = await sql`select 1 from public.simulated_balances where user_id = ${client.id}`
+if (!has) {
+  await sql`insert into public.simulated_balances (user_id, balance) values (${client.id}, 5000000)`
+  await sql`insert into public.ledger_entries (account, action_type, amounts, resulting_balances)
+            values (${'user:' + client.id}, 'simulated_credit', ${sql.json({ credit: 5000000 })}, ${sql.json({ balance: 5000000 })})`
+}
 await sql.end()
-console.log('Seeded: admin, mediator (default), client@goodcompany.test, contractor@goodcompany.test (passwords in .env)')
+console.log('Seeded: admin, mediator (default), client (EUR 50,000 simulated), contractor, supplier (passwords in .env)')

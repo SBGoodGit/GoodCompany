@@ -17,14 +17,28 @@ export default defineEventHandler(async (event) => {
     const [job] = await tx`select * from jobs where id = ${peek.job_id} for update`
     const { ws, party } = await loadWorkspace(tx, id, user.id, { lock: true })
     requireStage(ws, 'contract_preview')
-    if (job.selected_contractor_id) bad('This job has already been awarded', 409)
-    if (job.status === 'closed') bad('This job is closed')
+    const nested = !!ws.parent_contract_id
+    if (nested) {
+      // §4.5: a nested contract can be signed only after the payout or a part-payment of the first contract.
+      const [parent] = await tx`select status from contracts where id = ${ws.parent_contract_id}`
+      // Part-payment of the final delivery: an objection in part, or a repair agreement on the final request.
+      const [partPaid] = await tx`
+        select 1 from dispute_cases d join completion_requests r on r.id = d.completion_request_id
+         where d.contract_id = ${ws.parent_contract_id} and r.is_final and r.repair_agreement_id is null
+           and (d.scope = 'request_partial' or exists (select 1 from repair_agreements a where a.dispute_case_id = d.id))`
+      if (!['completed', 'closed', 'ended_unfinished'].includes(parent.status) && !partPaid) {
+        bad('The linked contract can be signed once the first contract has been paid out, at least in part (§4.5)', 409)
+      }
+    } else {
+      if (job.selected_contractor_id) bad('This job has already been awarded', 409)
+      if (job.status === 'closed') bad('This job is closed')
+    }
 
     const preview = await buildContractPreview(tx, ws)
     if (!preview) bad('The contract preview is not complete')
     if (b.snapshot_hash !== preview.hash) bad('The contract changed since you opened it. Reload and review it again.', 409)
 
-    if (party === 'client') {
+    if (party === 'client' && !nested) {
       const settings = await getSettings(tx)
       const rule = settings.multi_candidate_threshold
       if (job.indicative_budget !== null && job.indicative_budget >= rule.amount) {
@@ -59,15 +73,17 @@ export default defineEventHandler(async (event) => {
       return { status: 'awaiting_other_party' }
     }
 
-    // Both signed: award atomically.
-    const awarded = await tx`update jobs set selected_contractor_id = ${ws.contractor_id}
-                              where id = ${job.id} and selected_contractor_id is null returning id`
-    if (!awarded.length) bad('This job has already been awarded', 409)
+    // Both signed: award atomically (not for a nested contract: the job was already awarded).
+    if (!nested) {
+      const awarded = await tx`update jobs set selected_contractor_id = ${ws.contractor_id}
+                                where id = ${job.id} and selected_contractor_id is null returning id`
+      if (!awarded.length) bad('This job has already been awarded', 409)
+    }
     const s = preview.snapshot
     const [contract] = await tx`
-      insert into contracts (workspace_id, job_id, client_id, contractor_id, terms_version_id, quote_id, snapshot,
+      insert into contracts (workspace_id, job_id, client_id, contractor_id, parent_contract_id, terms_version_id, quote_id, snapshot,
                              snapshot_hash, mediator_id, currency, status)
-      values (${ws.id}, ${job.id}, ${ws.client_id}, ${ws.contractor_id}, ${preview.terms.id}, ${preview.quote.id},
+      values (${ws.id}, ${job.id}, ${ws.client_id}, ${ws.contractor_id}, ${ws.parent_contract_id}, ${preview.terms.id}, ${preview.quote.id},
               ${tx.json(s as never)}, ${preview.hash}, ${s.mediator.id}, ${s.quote.currency}, 'awaiting_funding')
       returning *`
     for (const m of s.milestones) {
@@ -75,9 +91,9 @@ export default defineEventHandler(async (event) => {
                values (${contract.id}, ${m.sequence}, ${m.kind}, ${m.description}, ${m.amount}, ${m.evidence_required})`
     }
     await tx`update negotiation_workspaces set stage = 'closed', outcome = 'accepted', closed_at = now(), last_activity_at = now() where id = ${ws.id}`
-    const siblings = await tx`
+    const siblings = nested ? [] : await tx`
       update negotiation_workspaces set stage = 'closed', outcome = 'closed_other_selected', closed_at = now()
-       where job_id = ${job.id} and id <> ${ws.id} and outcome = 'pending'
+       where job_id = ${job.id} and id <> ${ws.id} and outcome = 'pending' and parent_contract_id is null
       returning id, contractor_id`
     for (const sib of siblings) {
       await audit(tx, { event_type: 'workspace_closed_other_selected', actor_id: null, workspace_id: sib.id, payload: {} })

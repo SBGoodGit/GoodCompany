@@ -22,13 +22,14 @@ Emails (sign-up verification) arrive in the local Mailpit inbox: http://127.0.0.
 ```bash
 npm test                    # Vitest: business rules + database guarantees (needs the local DB)
 npx playwright install chromium   # once
-npm run test:e2e            # Playwright end-to-end flows (starts or reuses the dev server)
+npm run test:e2e            # Playwright: accounts, negotiation, escrow Path 1 and Path 2, Change Orders, repair, nested (starts or reuses the dev server)
 ```
 
 ## Layout
 
 - `supabase/migrations/` — data model, RLS, append-only rules, configuration defaults
 - `shared/` — pure business rules (money, terms, jobs), used by server, UI and unit tests
-- `server/api/` — REST endpoints; `server/utils/` — auth, step-up, audit, notifications, workspace snapshot
+- `server/ledger/` — `EscrowLedger` interface, `SimulatedLedger` (rules in `core.ts`)
+- `server/api/` — REST endpoints; `server/utils/` — auth, step-up, escrow actions, triggers, audit, notifications, workspace snapshot
 - `pages/`, `components/`, `composables/` — UI
 - `BUILD_NOTES.md` — implementation choices; `SESSION_LOG.md` — progress per build session

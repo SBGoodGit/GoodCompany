@@ -127,6 +127,7 @@ test('job → workspace → terms → quote → both sign → contract awaiting 
   await expect(c).toHaveURL(/\/contracts\//)
   await expect(c.getByTestId('contract-status')).toHaveText('awaiting funding')
   await expect(c.getByText('Execution may not start until the client has funded the escrow')).toBeVisible()
+  await c.getByText('Audit trail').click()
   await expect(c.getByText('contract created')).toBeVisible()
   const milestoneRows = c.locator('table').nth(0).locator('tbody tr')
   await expect(milestoneRows).toHaveCount(2)

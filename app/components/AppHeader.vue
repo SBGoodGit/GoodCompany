@@ -19,6 +19,7 @@ async function signOut() {
         <NuxtLink to="/contracts">Contracts</NuxtLink>
         <NuxtLink to="/contacts">Contacts</NuxtLink>
         <NuxtLink to="/profile">Profile</NuxtLink>
+        <NuxtLink v-if="me.user.role === 'mediator'" to="/mediator">Cases</NuxtLink>
         <NuxtLink v-if="me.user.role === 'admin'" to="/admin">Admin</NuxtLink>
       </nav>
       <span class="spacer" />

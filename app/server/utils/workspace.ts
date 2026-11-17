@@ -49,6 +49,7 @@ export async function buildContractPreview(tx: Tx, ws: any) {
   const snapshot = {
     format: 'goodcompany-contract-v1',
     workspace_id: ws.id,
+    parent_contract_id: ws.parent_contract_id ?? null,
     job: { id: job.id, title: job.title, description: job.description, category: job.category, region: job.region },
     client_id: ws.client_id,
     contractor_id: ws.contractor_id,

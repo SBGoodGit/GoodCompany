@@ -118,6 +118,7 @@ const money = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency',
       Client: {{ d.names[ws.client_id] }} · Contractor: <NuxtLink :to="`/users/${ws.contractor_id}`">{{ d.names[ws.contractor_id] }}</NuxtLink>
       · You are the {{ d.my_party }}
     </p>
+    <div v-if="ws.parent_contract_id" class="info small">Extra work as a linked contract with its own escrow. <NuxtLink :to="`/contracts/${ws.parent_contract_id}`">Open the first contract</NuxtLink></div>
     <div class="stepper">
       <div v-for="(s, i) in STAGES" :key="s" class="step" :class="{ done: i < stageIndex, current: i === stageIndex }">{{ label(s) }}</div>
     </div>
