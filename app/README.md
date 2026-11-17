@@ -1,0 +1,38 @@
+# GoodCompany MVP1 app
+
+Nuxt 3 + TypeScript, Supabase (local), simulated escrow. Built to Build Spec v3.007 (`../docs/spec/`).
+
+## Run locally
+
+Requirements: Docker running, Node 22, Supabase CLI.
+
+```bash
+npm install
+npx supabase start          # local stack on ports 55320–55329
+cp .env.example .env        # fill keys from: npx supabase status -o env
+npx supabase db reset       # apply migrations
+npm run seed                # admin, default Mediator, demo client (€50,000 simulated), contractor, supplier (passwords in .env)
+npm run dev                 # http://127.0.0.1:3100
+```
+
+Emails (sign-up verification) arrive in the local Mailpit inbox: http://127.0.0.1:55324
+
+## Tests
+
+```bash
+npm test                    # Vitest: business rules + database guarantees (needs the local DB)
+npx playwright install chromium   # once
+npm run test:e2e            # Playwright: accounts, negotiation, escrow Path 1 and Path 2, Change Orders, repair, nested (starts or reuses the dev server)
+```
+
+## Layout
+
+- `supabase/migrations/` — data model, RLS, append-only rules, configuration defaults
+- `shared/` — pure business rules (money, terms, jobs), used by server, UI and unit tests
+- `server/ledger/` — `EscrowLedger` interface, `SimulatedLedger` (rules in `core.ts`)
+- `server/api/` — REST endpoints; `server/utils/` — auth, step-up, escrow actions, triggers, audit, notifications, workspace snapshot
+- `pages/`, `components/`, `composables/` — UI
+- `BUILD_REPORT.md` — what was built, what not, choices, test results
+- `BUILD_NOTES.md` — implementation choices; `SESSION_LOG.md` — progress per build session
+
+System jobs run inside the server every 5 minutes when due (`server/plugins/scheduler.ts`); set `JOBS_DISABLED=1` to switch them off.
