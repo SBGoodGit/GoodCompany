@@ -97,3 +97,39 @@ Where Build Spec v3.007 leaves a detail open, the simplest option that satisfies
 ### Tests
 
 59. **Time-dependent steps in E2E tests** (tranches after 15/30 days, the 48-hour advice notice, 14 days of silence) are reached by moving the relevant timestamps back in the test database; the ledger and console always compare with the real clock.
+
+## Session 3
+
+### Final evaluation, invoices, reviews (part 9)
+
+60. **One completion hook.** Whenever the ledger reports a contract completed (normal approval, a settlement of a disputed final delivery, a repair agreement or an objection in part on the final delivery), `onContractCompleted` (`server/utils/completion.ts`) records the FinalEvaluation (contractor = time of the final completion request, client = the approval), generates the invoices and fee statement, raises the completed-contract counters, opens reviews and recomputes the contractor score. It is idempotent per contract.
+61. **Invoice amount** = principal deposited − client surplus = base quote + effective Change Orders (positive and negative), 100% without fee deduction (P19). The contractor also gets a separate **platform fee statement** for the fee actually transferred (`invoices.kind = 'fee_statement'`).
+62. **External reference (OD8 open): sequential**, `GC-INV-<year>-<000001>` from one database sequence (fee statements `GC-FEE-…`, Community Bank `GC-CB-…`; the client's copy of an invoice pair ends in `-R`). Sequential numbering is the common Dutch bookkeeping expectation; it is unique and stable, but not gapless (a rolled-back transaction can skip a number). A per-user gapless series can replace it later.
+63. **Reviews**: after completion only (status completed/closed — not for a contract ended by mutual settlement); one per party per contract (DB unique); motivation required for rating ≤ 3 with a minimum length (`review_motivation_min_length`, 100); motivation visible only on the contract page to both parties and in the reviewee's own profile. No edit, delete or appeal endpoints exist (Model B).
+64. **Contractor score**: average rating weighted by contract value × reliability factor; the factor is the on-time share over the last 20 completed contracts (on time = final completion request within `execution_period_days` of activation), floor 0.5. Computed from the first completed contract, shown publicly only from 10 completed contracts (Rookie Stage); individual public ratings are not shown either, because they would reveal the score. `stats_satisfaction_rate` = share of ratings ≥ 4. **Client score not computed** (O25 deferred); reviews received as client are stored. `stats_avg_response_time` is not computed (no rule in the spec; left null).
+65. **Warranty metrics** are computed on request from contracts and warranty cases: offered rate (warranty > 0), average days, completion rate (closed warranty periods without a warranty objection ÷ closed warranty periods, excluding 0-day).
+
+### Community Bank (part 10)
+
+66. **Two ledgers.** User simulated balances and the collect-wallet move only through `SimulatedLedger` (new methods `moveUserBalance`, `feeBatchTransfer`); the reserves and `ledger_transactions` are the Community Bank's own simulated ledger.
+67. **Fee batch split**: 1% of the batch to the organisation reserve, the rest 60/20/10/10 with largest-remainder rounding, recorded per batch with no contract reference (DB check on `ledger_transactions`).
+68. **Reserves need seed money to lend.** Fees alone (2% of contract value, 20% of that to Credit) give tiny reserves in a demo, so the admin can add simulated seed money to a reserve (`source_type = 'simulated_seed'`).
+69. **Loan flow (OD5 open: no admin gate)**: submitted → immediately `community_voting` with the sampled invitations; resolution as soon as the required votes are in (on each vote, and by the hourly job), or rejected when the 14-day window ends. Approval also requires that the Credit Reserve covers the amount and the Safety Reserve stays at ≥ 55% of its target share after it; approval activates the loan at once: the amount leaves the Credit Reserve into a SubEscrow for the supplier.
+70. **SubEscrow release**: the applicant releases it to the supplier when ordering; the supplier's simulated balance is credited and an invoice pair is generated (supplier issued, applicant received). The money never reaches the applicant.
+71. **Voter sampling**: crypto-random sample without replacement from eligible members (account age ≥ 30 days, ≥ 1 completed contract as client or contractor, never applicant or supplier). If fewer members are eligible than the audience size, all eligible members are invited; an application that cannot reach the required votes is rejected at the end of the window.
+72. **What voters see (OD6 open)**: purpose, category, amount, term, rate and projected income; not the applicant's or supplier's identity, and not the running tally until the vote is resolved.
+73. **Repayment (OD9 open: simple interest)**: interest accrues pro rata to time on the outstanding principal; a repayment pays accrued interest first, then principal. Early or partial repayment therefore pays only the interest accrued so far — remaining interest falls pro rata, without penalty. Principal and interest return to the Credit Reserve.
+74. **Default** is set by an admin by hand (no automated detection, §1.3); it records a write-off entry (the principal already left the Credit Reserve at disbursement) and feeds the health score.
+75. **Community Health Score (illustrative)**: 0–100 = 40 × reserve level (Safety vs target, capped at 1) + 30 × (1 − default rate) + 30 × (1 − utilisation, outstanding ÷ (outstanding + Credit)). v2 names the inputs but no formula.
+
+### Notifications, dashboard, admin (part 11)
+
+76. **Notifications are in-app only** (header badge, notifications page, dashboard). No email is sent except Supabase's own sign-up verification; MVP1 has no outbound mail setup.
+77. **Dashboard** shows deadlines of open final/repair requests (response window, payment deadline) and open cases (mediator period), active negotiations, contracts, the Community Bank snapshot and pending vote invitations. The client does not see an escrow balance there (it would reveal supplier payments).
+78. **Admin settings**: every §12 value is editable as JSON on the admin page; `holdback_percentage` is fixed and refused by the API. Settings are read at the moment they are used (e.g. the fee rate is copied onto the contract at funding, so later changes do not affect running contracts).
+
+### System jobs (part 12)
+
+79. **Scheduler**: a Nitro server plugin ticks every 5 minutes and runs each job whose interval has passed since its last run (`job_runs`); the fee aggregation interval follows `fee_batch_interval_minutes`. Jobs: triggers (b)/(c) hourly, Mediator due-date daily, Change Order expiry hourly, escrow action expiry hourly (added: §5.4's 72-hour signature TTL), workspace inactivity daily, fee aggregation, vote resolution hourly, contact reconciliation daily, health score daily. Admins can run one or all jobs from the admin page. Set `JOBS_DISABLED=1` to switch the scheduler off (e.g. extra app instances).
+80. **Idempotence**: every job selects what is due now, so a re-run does nothing new and a late run still catches every passed moment; notices carry dedupe keys (e.g. the inactivity notice per workspace and activity time, Mediator due-date notices per case and due date).
+81. **Mediator due-date check** reminds Mediator and parties from `mediator_due_notice_days` (3, new setting) before the due date and again at the due date. An extension gives a new date and therefore new reminders.

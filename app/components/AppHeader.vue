@@ -18,12 +18,15 @@ async function signOut() {
         <NuxtLink to="/workspaces">Workspaces</NuxtLink>
         <NuxtLink to="/contracts">Contracts</NuxtLink>
         <NuxtLink to="/contacts">Contacts</NuxtLink>
+        <NuxtLink to="/community-bank">Community Bank</NuxtLink>
+        <NuxtLink to="/invoices">Invoices</NuxtLink>
         <NuxtLink to="/profile">Profile</NuxtLink>
         <NuxtLink v-if="me.user.role === 'mediator'" to="/mediator">Cases</NuxtLink>
         <NuxtLink v-if="me.user.role === 'admin'" to="/admin">Admin</NuxtLink>
       </nav>
       <span class="spacer" />
       <template v-if="me">
+        <NuxtLink to="/notifications" class="small" data-test="notifications-link">Notifications<span v-if="me.unread_notifications" class="tag orange" style="margin-left: 0.25rem">{{ me.unread_notifications }}</span></NuxtLink>
         <span class="small muted">{{ me.profile.display_name }} · {{ me.user.role }}</span>
         <button class="btn secondary small" data-test="sign-out" @click="signOut">Sign out</button>
       </template>

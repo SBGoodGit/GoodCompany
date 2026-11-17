@@ -10,6 +10,8 @@ export default defineEventHandler(async (event) => {
   if (!row) bad('Profile not found', 404)
   const settings = await getSettings()
   const rookie = Number(settings.rookie_reviews_required ?? 10)
+  const warranty = await warrantyMetricsFor(db(), userId)
+  const isPublic = row.completed_as_contractor >= rookie
   const portfolio = await db()`select id, title, description, media_urls from portfolio_items where profile_id = ${row.id} order by created_at desc`
   return {
     user_id: row.user_id,
@@ -23,8 +25,10 @@ export default defineEventHandler(async (event) => {
     completed_as_contractor: row.completed_as_contractor,
     completed_as_client: row.completed_as_client,
     stats_completed_jobs: row.stats_completed_jobs,
-    reputation_public: row.completed_as_contractor >= rookie,
-    reputation_score_as_contractor: row.completed_as_contractor >= rookie ? row.reputation_score_as_contractor : null,
+    reputation_public: isPublic,
+    reputation_score_as_contractor: isPublic ? row.reputation_score_as_contractor : null,
+    stats_satisfaction_rate: isPublic ? row.stats_satisfaction_rate : null,
+    ...warranty,
     rookie_reviews_required: rookie,
     portfolio,
   }

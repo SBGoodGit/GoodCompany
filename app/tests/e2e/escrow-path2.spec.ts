@@ -135,15 +135,15 @@ test('trigger (b): 14 days of client silence opens a case and activates the Medi
   const before = await sql`select balance from simulated_balances where user_id = ${contractor.id}`
   await sql`update completion_requests set last_party_action_at = now() - interval '15 days' where contract_id = ${id} and status = 'open'`
   const admin = await tokenFor({ email: process.env.SEED_ADMIN_EMAIL!, password: process.env.SEED_ADMIN_PASSWORD! })
-  const r1 = await call(admin, 'POST', '/api/admin/system/run-triggers')
-  expect(r1.disputes_opened).toBeGreaterThanOrEqual(1)
+  const r1 = await call(admin, 'POST', '/api/admin/system/run-job', { job: 'triggers' })
+  expect(r1.result.disputes_opened).toBeGreaterThanOrEqual(1)
   const [d] = await sql`select * from dispute_cases where contract_id = ${id}`
   expect(d).toMatchObject({ opened_by: 'system', trigger: 'silence', status: 'mediator_active' })
   expect(d.mediator_activated_at).not.toBeNull()
   const after = await sql`select balance from simulated_balances where user_id = ${contractor.id}`
   expect(after[0].balance).toBe(before[0].balance) // nothing happens by itself (L4)
   // Re-running is idempotent
-  await call(admin, 'POST', '/api/admin/system/run-triggers')
+  await call(admin, 'POST', '/api/admin/system/run-job', { job: 'triggers' })
   expect((await sql`select count(*)::int as n from dispute_cases where contract_id = ${id}`)[0].n).toBe(1)
   // The waiting contractor may confirm the escalation; still no money moves
   await escrowAction({ token: await tokenFor(contractor), password: contractor.password }, id, 'escalate', { dispute_id: d.id })

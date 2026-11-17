@@ -46,6 +46,43 @@ export class SimulatedLedger implements EscrowLedger {
     return row.balance as number
   }
 
+  /**
+   * Move simulated money for the Community Bank (§3.6): from a user (debit) and/or to a user (credit).
+   * `null` on one side is the Community Bank's own ledger. Refuses to go below zero.
+   */
+  async moveUserBalance(fromUser: string | null, toUser: string | null, amount: number, type: string, ref: Record<string, unknown> = {}) {
+    if (!Number.isInteger(amount) || amount <= 0) throw new LedgerRejection('Amount must be a positive whole amount')
+    if (fromUser) {
+      const [row] = await this.tx`update simulated_balances set balance = balance - ${amount}
+                                   where user_id = ${fromUser} and balance >= ${amount} returning balance`
+      if (!row) throw new LedgerRejection('The simulated balance is too low')
+      await this.tx`insert into ledger_entries (account, action_type, signers, amounts, resulting_balances)
+        values (${'user:' + fromUser}, ${type}, ${[fromUser]}, ${this.tx.json({ debit: amount, ...ref } as never)}, ${this.tx.json({ balance: row.balance })})`
+    }
+    if (toUser) {
+      const [row] = await this.tx`insert into simulated_balances (user_id, balance) values (${toUser}, ${amount})
+        on conflict (user_id) do update set balance = simulated_balances.balance + ${amount} returning balance`
+      await this.tx`insert into ledger_entries (account, action_type, amounts, resulting_balances)
+        values (${'user:' + toUser}, ${type}, ${this.tx.json({ credit: amount, ...ref } as never)}, ${this.tx.json({ balance: row.balance })})`
+    }
+  }
+
+  /**
+   * Fee aggregation (§7.1, D10): if the collect-wallet holds at least `minCount` fees, transfer its full
+   * balance to the Community Bank as one batch. Returns the batch, or null when there are too few fees.
+   * The batch carries no contract references, so a single contract's size is not derivable.
+   */
+  async feeBatchTransfer(minCount: number) {
+    const items = await this.tx`select id, amount from fee_collection_items where fee_batch_id is null for update`
+    if (items.length < minCount || items.length === 0) return null
+    const total = items.reduce((a: number, i: any) => a + Number(i.amount), 0)
+    const [batch] = await this.tx`insert into fee_batches (fee_count, total_amount) values (${items.length}, ${total}) returning *`
+    await this.tx`update fee_collection_items set fee_batch_id = ${batch.id} where id = any(${items.map((i: any) => i.id)})`
+    await this.tx`insert into ledger_entries (account, action_type, amounts, resulting_balances)
+      values ('fee_collection', 'fee_batch_transfer', ${this.tx.json({ total, fee_count: items.length })}, ${this.tx.json({ fee_collection_balance: 0 })})`
+    return { id: batch.id as string, total, count: items.length }
+  }
+
   /** Admin assignment of the contract's Mediator (P15), only while no Mediator is active on a case. */
   async assignMediator(contractId: string, mediatorId: string, actorId: string) {
     const [k] = await this.tx`select id from contracts where id = ${contractId} for update`

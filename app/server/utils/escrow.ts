@@ -84,6 +84,8 @@ export async function signAction(event: H3Event, tx: Tx, userId: string, actionI
     })
     await audit(tx, { event_type: `escrow_${act.action_type}`, actor_id: userId, contract_id: act.contract_id, payload: { action_id: act.id, signers } })
     for (const n of result.notices) await notify(tx, { user_id: n.user_id, type: 'escrow', title: n.title, body: n.body, link: `/contracts/${act.contract_id}` })
+    // Final approval (also through a settlement or repair agreement): evaluation, invoices, reviews (§5.6)
+    if (result.state.completedAt) await onContractCompleted(tx, act.contract_id)
     return { status: 'applied' as const, action: { ...act, status: 'applied' }, summary: result.summary }
   } catch (e) {
     if (!(e instanceof LedgerRejection)) throw e

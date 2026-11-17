@@ -40,3 +40,18 @@ UI: contract page with escrow overview (labelled simulated), signing dialog with
 - The dashboard shows notifications as a plain list; deadlines of open requests and cases are on the contract and case pages, not yet on the dashboard (part 11).
 
 **Session 3 starts with:** part 9 — FinalEvaluation, invoices and fee statement on final approval (hook into `finalize` results in `server/utils/escrow.ts → signAction`, action type `approve`/`settle`), reviews and reputation; then parts 10–12.
+
+## Session 3 — 17 November 2026
+
+**Built (parts 9–12 of assignment §6):**
+
+9. **Final evaluation, invoices, reviews, reputation** — completion hook on every path that completes a contract; FinalEvaluation; invoice pair at 100% plus a separate fee statement, sequential stable references; discrepancy notes; reviews with mandatory motivation ≤ 3; contractor score with reliability factor and Rookie Stage; warranty metrics on profiles.
+10. **Community Bank** — fee aggregation into batches split over the reserves (organisation 1%), public batch list; loan applications with derived interest, sampled invitations, voting and resolution with reserve checks, SubEscrow released to the supplier with invoices, early/partial repayment, manual default, Community Health Score, admin reserve seed.
+11. **Notifications, dashboard, admin** — notification page and badge; dashboard with deadlines and Community Bank snapshot; admin editing of all §12 values (holdback fixed), jobs, loans, reserves, balances, Mediators.
+12. **System jobs** — 5-minute scheduler with per-job intervals for all §10 jobs plus escrow action expiry; idempotent, logged in `job_runs`.
+
+**Tests:** 75 Vitest + 12 Playwright, all passing (details in `BUILD_REPORT.md` §4). Production build succeeds.
+
+**Unfinished:** nothing from parts 1–12 of the assignment. What the spec leaves out or open is listed in `BUILD_REPORT.md` §2.
+
+**Next:** Sander reviews `BUILD_REPORT.md` and decides on push/merge of branch `mvp1`.

@@ -12,11 +12,15 @@ const ledger = ref<any[]>([])
 const error = ref('')
 const notice = ref('')
 
+const ev = ref<any>(null) // final evaluation, invoices, reviews
 async function load() {
-  const [detail, escrow] = await Promise.all([api(`/api/contracts/${id.value}`), api(`/api/contracts/${id.value}/escrow`)])
+  const [detail, escrow, evaluation] = await Promise.all([api(`/api/contracts/${id.value}`), api(`/api/contracts/${id.value}/escrow`), api(`/api/contracts/${id.value}/evaluation`)])
   d.value = detail
   e.value = escrow
+  ev.value = evaluation
 }
+const review = reactive({ rating: 5, motivation: '' })
+const discrepancy = ref('')
 onMounted(load)
 async function act(fn: () => Promise<any>, ok = '') {
   error.value = ''
@@ -307,6 +311,29 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
       </div>
       <div v-for="n in e.nested_contracts" :key="n.id">Linked contract: <NuxtLink :to="`/contracts/${n.id}`">{{ n.title }}</NuxtLink> ({{ n.status }})</div>
       <div v-for="w in e.nested_workspaces.filter((x: any) => x.stage !== 'closed')" :key="w.id">Negotiation for extra work: <NuxtLink :to="`/workspaces/${w.id}`">{{ w.stage }}</NuxtLink></div>
+    </div>
+
+    <!-- Final evaluation, invoices, reviews (§5.6, §7.8) -->
+    <div v-if="ev && (ev.evaluation || ev.invoices.length || ev.can_review || ev.reviews.length)" class="card small" data-test="evaluation">
+      <h3>Final evaluation</h3>
+      <div v-if="ev.evaluation?.client_signed_at">Signed by the contractor (final delivery) {{ ev.evaluation.contractor_signed_at?.slice(0, 10) }} and the client (approval) {{ ev.evaluation.client_signed_at.slice(0, 10) }}.</div>
+      <div v-for="(n, i) in ev.evaluation?.discrepancy_notes ?? []" :key="i" class="muted">Discrepancy note ({{ n.party }}): {{ n.note }}</div>
+      <form class="row" style="margin-top: 0.4rem" @submit.prevent="act(async () => { await api(`/api/contracts/${id}/evaluation/discrepancy-note`, { method: 'POST', body: { note: discrepancy } }); discrepancy = '' }, 'Note added')">
+        <input v-model="discrepancy" placeholder="Add a discrepancy note (does not block completion)" style="flex: 1" /><button class="btn secondary small" type="submit">Add</button>
+      </form>
+      <h4>Invoices</h4>
+      <p v-if="!ev.invoices.length" class="muted">Generated at final approval.</p>
+      <div v-for="i in ev.invoices" :key="i.id" data-test="invoice"><code>{{ i.external_reference_id }}</code> · {{ i.kind === 'fee_statement' ? 'platform fee statement' : `invoice (${i.direction})` }} · {{ money(i.amount) }}</div>
+      <h4>Reviews</h4>
+      <div v-for="(r, i) in ev.reviews" :key="i">{{ name(r.reviewer_id) }} rated {{ name(r.reviewee_id) }} as {{ r.reviewee_role }}: <b>{{ r.rating }}/5</b><div v-if="r.motivation" class="muted">{{ r.motivation }}</div></div>
+      <form v-if="ev.can_review" style="margin-top: 0.4rem" @submit.prevent="act(() => api(`/api/contracts/${id}/reviews`, { method: 'POST', body: review }), 'Review submitted')">
+        <label>Your rating of the {{ isClient ? 'contractor' : 'client' }}</label>
+        <select v-model.number="review.rating" style="width: 120px" data-test="review-rating"><option v-for="n in [5, 4, 3, 2, 1]" :key="n" :value="n">{{ n }}</option></select>
+        <label>Motivation {{ review.rating <= 3 ? '(required, at least 100 characters)' : '(optional)' }} — private to the two of you</label>
+        <textarea v-model="review.motivation" data-test="review-motivation" />
+        <button class="btn small" type="submit" data-test="submit-review">Submit review</button>
+        <p class="muted">Reviews cannot be changed or removed afterwards.</p>
+      </form>
     </div>
 
     <!-- Frozen contract and audit trail -->

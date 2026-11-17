@@ -11,7 +11,7 @@ npm install
 npx supabase start          # local stack on ports 55320–55329
 cp .env.example .env        # fill keys from: npx supabase status -o env
 npx supabase db reset       # apply migrations
-npm run seed                # admin, default Mediator, demo client + contractor (passwords go in .env)
+npm run seed                # admin, default Mediator, demo client (€50,000 simulated), contractor, supplier (passwords in .env)
 npm run dev                 # http://127.0.0.1:3100
 ```
 
@@ -32,4 +32,7 @@ npm run test:e2e            # Playwright: accounts, negotiation, escrow Path 1 a
 - `server/ledger/` — `EscrowLedger` interface, `SimulatedLedger` (rules in `core.ts`)
 - `server/api/` — REST endpoints; `server/utils/` — auth, step-up, escrow actions, triggers, audit, notifications, workspace snapshot
 - `pages/`, `components/`, `composables/` — UI
+- `BUILD_REPORT.md` — what was built, what not, choices, test results
 - `BUILD_NOTES.md` — implementation choices; `SESSION_LOG.md` — progress per build session
+
+System jobs run inside the server every 5 minutes when due (`server/plugins/scheduler.ts`); set `JOBS_DISABLED=1` to switch them off.

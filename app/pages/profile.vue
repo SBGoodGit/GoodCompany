@@ -40,6 +40,13 @@ const selfRoles = computed(() => ['client', 'contractor', 'both'].includes(d.val
       <div v-if="error" class="error">{{ error }}</div><div v-if="msg" class="info">{{ msg }}</div>
       <button class="btn" type="submit" data-test="save-profile">Save profile</button>
     </form>
+    <div class="card small">
+      <h3>Reviews received</h3>
+      <p class="muted">Your contractor score counts internally from your first completed contract: {{ d.profile.reputation_score_as_contractor ?? '—' }}. It becomes public after the Rookie Stage.</p>
+      <p v-if="!d.reviews.length" class="muted">No reviews yet.</p>
+      <div v-for="(r, i) in d.reviews" :key="i"><b>{{ r.rating }}/5</b> as {{ r.reviewee_role }} from {{ r.reviewer }}<div v-if="r.motivation" class="muted">{{ r.motivation }}</div></div>
+      <p class="muted">Warranty: offered on {{ d.warranty.warranty_offered_rate === null ? '—' : Math.round(d.warranty.warranty_offered_rate * 100) + '%' }} of completed jobs · average {{ d.warranty.warranty_avg_days ?? '—' }} days · completed without claim {{ d.warranty.warranty_completion_rate === null ? '—' : Math.round(d.warranty.warranty_completion_rate * 100) + '%' }}</p>
+    </div>
     <div class="card">
       <h3>Portfolio</h3>
       <div v-for="p in d.portfolio" :key="p.id" class="row small"><b>{{ p.title }}</b><span class="muted">{{ p.description }}</span><span class="spacer" /><button class="btn danger small" @click="delItem(p.id)">Delete</button></div>
