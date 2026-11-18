@@ -1,7 +1,17 @@
-// Runs the system jobs (§10): a tick every 5 minutes starts each job whose interval has passed.
-// Disable with JOBS_DISABLED=1 (e.g. when several app instances share one database).
-export default defineNitroPlugin(() => {
-  if (process.env.JOBS_DISABLED === '1' || import.meta.prerender) return
+// Runs the system jobs (§10): every 5 minutes a tick starts each job whose interval has passed.
+// - Node (`nuxt dev`): a timer in the server process.
+// - Cloudflare Workers (online): the Cron Trigger "*/5 * * * *" in wrangler.jsonc wakes the Worker's
+//   scheduled handler, which fires the `cloudflare:scheduled` hook (hosting plan C3).
+// Jobs are idempotent and catch up on missed ticks. Disable with JOBS_DISABLED=1.
+export default defineNitroPlugin((nitroApp) => {
+  if (import.meta.prerender) return
+  if (isWorkers()) {
+    nitroApp.hooks.hook('cloudflare:scheduled', async () => {
+      try { await withJobDb(() => schedulerTick()) } catch (e) { console.error('[jobs]', (e as Error).message) }
+    })
+    return
+  }
+  if (process.env.JOBS_DISABLED === '1') return
   let running = false
   const tick = async () => {
     if (running) return

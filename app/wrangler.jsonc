@@ -1,0 +1,24 @@
+{
+  // Cloudflare Worker for GoodCompany MVP1 (hosting plan §3–§4). Nitro generates the rest of the
+  // Worker config (main, assets, compatibility) and merges this file in at build time
+  // (nitro.cloudflare.deployConfig in nuxt.config.ts).
+  //
+  // The name is pinned: without it Nitro would use an auto-generated name and a manual
+  // `wrangler deploy` would create a second Worker (the P3 lesson of 1 October 2026).
+  // Deploy only through a push to main (Cloudflare Workers Builds), never by hand.
+  "name": "goodcompany-mvp1",
+  "compatibility_date": "2025-07-15",
+  // System jobs (§10 of the Build Spec): one tick every 5 minutes; each job runs when its own
+  // interval has passed (server/utils/jobs.ts). Idempotent, so a late or missed tick catches up.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  // Database through Hyperdrive, logging in as the restricted role gc_app.
+  // The id is filled in once the Hyperdrive configuration exists in the Cloudflare dashboard.
+  "hyperdrive": [
+    { "binding": "HYPERDRIVE", "id": "REPLACE_WITH_HYPERDRIVE_ID" }
+  ],
+  "observability": {
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true, "persist": true }
+  }
+}
