@@ -12,7 +12,9 @@ export default defineEventHandler(async (event) => {
     ? await sql`
         select w.id, w.stage, w.outcome, w.contractor_id, p.display_name as contractor_name, w.last_activity_at
           from negotiation_workspaces w join profiles p on p.user_id = w.contractor_id
-         where w.job_id = ${id} order by w.created_at`
+         where w.job_id = ${id} and w.parent_contract_id is null order by w.last_activity_at desc`
     : await sql`select id, stage, outcome from negotiation_workspaces where job_id = ${id} and contractor_id = ${user.id}`
-  return { job: jobForViewer(job, user.id), is_owner: isOwner, workspaces }
+  // Candidate limits for the client's conversation overview (round 2, D28 §E, §F2).
+  const candidates = isOwner ? await candidateSlots(sql, id) : null
+  return { job: jobForViewer(job, user.id), is_owner: isOwner, workspaces, candidates }
 })

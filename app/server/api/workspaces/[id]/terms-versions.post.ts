@@ -1,6 +1,6 @@
-// Propose a terms version (§3.4, §5.3). Either party, in the terms stage. Validates the
-// holdback and phase rules; earlier open proposals are superseded. The mediator is the one
-// assigned by an admin (P15): per workspace, or the admin's default mediator.
+// Propose a terms version (§3.4, §5.3). Round 2 (D28 §A1): only the contractor proposes terms,
+// including the payment phase structure; amounts and percentages follow from the itemised estimate.
+// Earlier open proposals are superseded. The mediator is the one assigned by an admin (P15).
 import { validateTerms, type TermsInput } from '../../../../shared/terms'
 
 export default defineEventHandler(async (event) => {
@@ -9,6 +9,7 @@ export default defineEventHandler(async (event) => {
   return db().begin(async (tx) => {
     const { ws, party } = await loadWorkspace(tx, getRouterParam(event, 'id')!, user.id, { lock: true })
     requireStage(ws, 'terms')
+    if (party !== 'contractor') bad('Only the contractor proposes terms. You can accept them, reject them or ask for a revision.')
     const settings = await getSettings(tx)
     const rules = {
       feePercentage: Number(settings.platform_fee_rate),
@@ -19,12 +20,10 @@ export default defineEventHandler(async (event) => {
       ...b,
       warranty_period_days: Number(b.warranty_period_days),
       execution_period_days: Number(b.execution_period_days),
-      materials_budget_percentage: b.materials_budget_percentage === null || b.materials_budget_percentage === undefined || (b.materials_budget_percentage as any) === ''
-        ? null : Number(b.materials_budget_percentage),
+      materials_budget_percentage: null, // derived from the estimate's material lines
       payment_phases: (b.payment_phases ?? []).map((p, i) => ({
         sequence: i + 1,
         kind: p.kind,
-        percentage: Number(p.percentage),
         description: String(p.description ?? '').trim(),
         evidence_required: String(p.evidence_required ?? '').trim(),
       })),

@@ -1,5 +1,6 @@
 // GoodTrade service (§2.1, §5.4): prepares escrow actions, collects signatures and submits
 // fully signed actions to the Escrow Ledger. It never changes a balance itself (L1).
+import { linesOrderedByPayment } from '../../shared/materials'
 import type { H3Event } from 'h3'
 import { SimulatedLedger } from '../ledger/simulated'
 import { LedgerRejection, type Action } from '../ledger/types'
@@ -80,6 +81,12 @@ export async function signAction(event: H3Event, tx: Tx, userId: string, actionI
     const result = await tx.savepoint(async (sp) => {
       const r = await ledgerFor(sp).submit(act.contract_id, { type: act.action_type, params: act.params, actor: act.created_by }, signers, act.id)
       await sp`update escrow_actions set status = 'applied', applied_at = now() where id = ${act.id}`
+      // D29: a supplier payment sets its linked material lines to "ordered" (never "delivered").
+      if (act.action_type === 'pay_supplier' && act.params.material_line_ids?.length) {
+        const lines = await sp`select id, position, description, quantity, unit, amount, status from contract_material_lines where contract_id = ${act.contract_id}`
+        const ordered = linesOrderedByPayment(lines as any, act.params.material_line_ids)
+        if (ordered.length) await sp`update contract_material_lines set status = 'ordered', updated_by = ${act.created_by}, updated_at = now() where id in ${sp(ordered)}`
+      }
       return r
     })
     await audit(tx, { event_type: `escrow_${act.action_type}`, actor_id: userId, contract_id: act.contract_id, payload: { action_id: act.id, signers } })

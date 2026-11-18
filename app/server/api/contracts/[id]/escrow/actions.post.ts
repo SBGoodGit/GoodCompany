@@ -21,6 +21,15 @@ export default defineEventHandler(async (event) => {
       params.supplier_id = sup.id
       delete params.supplier_email
     }
+    if (b.type === 'pay_supplier') {
+      // D29: a supplier payment is linked to one or more lines of "materials bought from third parties".
+      const lines = await tx`select id from contract_material_lines where contract_id = ${id}`
+      const ids = Array.isArray(params.material_line_ids) ? params.material_line_ids.map(String) : []
+      if (lines.length && !ids.length) bad('Choose the material line(s) this supplier payment is for')
+      const known = new Set(lines.map((l: any) => l.id))
+      if (ids.some((x: string) => !known.has(x))) bad('A linked material line does not belong to this contract')
+      params.material_line_ids = [...new Set(ids)]
+    }
     return prepareAction(tx, user.id, id, String(b.type), params)
   })
 })

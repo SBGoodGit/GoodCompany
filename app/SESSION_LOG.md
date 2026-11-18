@@ -68,3 +68,34 @@ On Build Spec v3.008 / Decision Log v1.012 (D27), copied into `docs/spec/`. Choi
 
 **Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
 
+## Round 2 — 18 November 2026
+
+Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_Ronde2.md` (D28). Choices in `BUILD_NOTES.md` 86–97.
+
+- **A.** Only the contractor proposes terms; the client accepts (with the commitment warning), rejects, or asks for a revision with a comment; client constraints per workspace.
+- **B.** Two-way intake; mandatory budget range from the client, visible in that workspace only.
+- **C.** Itemised quote: scope of work, sections and lines; phase amounts, materials budget and fee line derived (`shared/estimate.ts`); final phase ≥ 10%; detail level per quote; completion requests show their phase's lines. Ledger unchanged.
+- **E.** Candidate limits (3 past the introduction, 2 swaps, no swap after the quote stage) replace the multi-candidate warning; settings in the admin layer.
+- **F.** Pause new applicants, conversation overview and switching, private client notes.
+- Migration `20261121000001_round2.sql`.
+
+**Tests:** 87 Vitest + 13 Playwright, all passing; the §7.1 example also passes built through an itemised estimate. `npm run build` succeeds.
+
+**Note:** the decision log in `specs/` is still v1.012 and does not yet contain D28; the copy in `docs/spec/` is therefore unchanged. The proposal on disk is v0.203, not v0.204.
+
+**Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
+
+## Round 2b — 18 November 2026
+
+Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_Ronde2b.md` (D29). Decision Log v1.015 copied to `docs/spec/`. Choices in `BUILD_NOTES.md` 98–102.
+
+- Three section kinds; own-supply materials in the final phase (refused earlier), third-party materials in the materials budget.
+- Phase rule: every phase an amount above zero from work or own-supply lines.
+- Material-only delivery: no holdback, no tranches; final ≥ 10% only when a holdback applies.
+- Supplier declaration on every supplier payment (ledger condition).
+- Order status per third-party material line; a supplier payment sets its lines to ordered; replaces the contract-wide `materials_ordered` status. Migration `20261122000001_round2b.sql`.
+
+**Tests:** 95 Vitest + 14 Playwright, all passing; §7.1 unchanged. `npm run build` succeeds.
+
+**Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
+

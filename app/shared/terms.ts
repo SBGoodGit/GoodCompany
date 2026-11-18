@@ -1,12 +1,13 @@
 // Terms of engagement and quote rules (Build Spec v3 §3.4, §7.1–§7.3)
-import { BP_TOTAL, largestRemainder, percentToBp } from './money'
+import { largestRemainder, percentToBp } from './money'
 
 export type PhaseKind = 'advance' | 'work' | 'final'
 
 export interface PaymentPhase {
   sequence: number
   kind: PhaseKind
-  percentage: number
+  /** Round 2: computed from the itemised estimate, not entered in the terms. Only quoteBreakdown uses it. */
+  percentage?: number
   description: string
   evidence_required: string
 }
@@ -19,7 +20,7 @@ export interface TermsInput {
   warranty_period_days: number
   holdback_percentage?: number
   payment_phases: PaymentPhase[]
-  materials_budget_percentage?: number | null
+  materials_budget_percentage?: number | null // round 2: derived from the estimate's material lines
   execution_period_days: number
 }
 
@@ -35,7 +36,11 @@ export const DEFAULT_TERMS_RULES: TermsRules = { feePercentage: 2, warrantyOptio
  *  percentage (whose amount the largest-remainder split never rounds below the floor) always covers it. */
 export const holdbackOf = (value: number, pct: number) => Math.floor((value * pct) / 100)
 
-/** Validate a terms version. Returns a list of human-readable errors (empty = valid). */
+/**
+ * Validate a terms version (round 2, D28): the contractor proposes the phase *structure* (kind,
+ * description, evidence). Amounts and percentages come from the itemised estimate, which also checks
+ * that the final phase is at least the holdback (shared/estimate.ts). Returns readable errors.
+ */
 export function validateTerms(t: TermsInput, rules: TermsRules = DEFAULT_TERMS_RULES): string[] {
   const errors: string[] = []
   if (!rules.warrantyOptions.includes(t.warranty_period_days)) {
@@ -52,36 +57,15 @@ export function validateTerms(t: TermsInput, rules: TermsRules = DEFAULT_TERMS_R
   const finals = phases.filter((p) => p.kind === 'final')
   if (finals.length !== 1) errors.push('Exactly one phase must be of kind "final"')
   else if (phases[phases.length - 1].kind !== 'final') errors.push('The final phase must be last in sequence')
-  else if (!(finals[0].percentage >= rules.holdbackPercentage)) {
-    // §3.4, D27: the holdback is always withheld in full from the final payout.
-    errors.push(`The final phase must be at least ${rules.holdbackPercentage}% of the contract value, so the ${rules.holdbackPercentage}% holdback can be withheld in full (now ${finals[0].percentage}%)`)
-  }
   phases.forEach((p, i) => {
     if (p.sequence !== i + 1) errors.push('Phase sequence numbers must run 1, 2, 3, … without gaps')
     if (!['advance', 'work', 'final'].includes(p.kind)) errors.push(`Phase ${p.sequence}: kind must be advance, work or final`)
-    if (!(p.percentage > 0)) errors.push(`Phase ${p.sequence}: percentage must be greater than 0`)
     if (!p.description?.trim()) errors.push(`Phase ${p.sequence}: description is required`)
     if (p.kind !== 'advance' && !p.evidence_required?.trim()) {
       errors.push(`Phase ${p.sequence}: describe the evidence that makes a completion request formal`)
     }
   })
-  const materials = t.materials_budget_percentage ?? 0
-  if (materials < 0) errors.push('Materials budget percentage cannot be negative')
-  try {
-    const sumBp = phases.reduce((a, p) => a + percentToBp(p.percentage), 0) + percentToBp(materials) + percentToBp(rules.feePercentage)
-    if (sumBp !== BP_TOTAL) {
-      errors.push(
-        `Phases (${fmtPct(sumBp - percentToBp(materials) - percentToBp(rules.feePercentage))}%), materials budget (${materials}%) and the ${rules.feePercentage}% platform fee must together make 100% (now ${fmtPct(sumBp)}%)`,
-      )
-    }
-  } catch (e) {
-    errors.push((e as Error).message)
-  }
   return [...new Set(errors)]
-}
-
-function fmtPct(bp: number) {
-  return (bp / 100).toString()
 }
 
 export interface QuoteBreakdown {
@@ -96,7 +80,7 @@ export interface QuoteBreakdown {
  */
 export function quoteBreakdown(totalAmount: number, terms: Pick<TermsInput, 'payment_phases' | 'materials_budget_percentage'>, feePercentage: number): QuoteBreakdown {
   const phases = [...terms.payment_phases].sort((a, b) => a.sequence - b.sequence)
-  const weights = [percentToBp(feePercentage), percentToBp(terms.materials_budget_percentage ?? 0), ...phases.map((p) => percentToBp(p.percentage))]
+  const weights = [percentToBp(feePercentage), percentToBp(terms.materials_budget_percentage ?? 0), ...phases.map((p) => percentToBp(p.percentage ?? 0))]
   const parts = largestRemainder(totalAmount, weights)
   return {
     fee_amount: parts[0],

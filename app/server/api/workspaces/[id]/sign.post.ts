@@ -7,7 +7,7 @@
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
   const id = getRouterParam(event, 'id')!
-  const b = await readBody<{ snapshot_hash?: string; override_multi_candidate?: boolean }>(event)
+  const b = await readBody<{ snapshot_hash?: string }>(event)
   const sql = db()
   const [peek] = await sql`select job_id from negotiation_workspaces where id = ${id}`
   if (!peek) bad('Workspace not found', 404)
@@ -37,24 +37,6 @@ export default defineEventHandler(async (event) => {
     const preview = await buildContractPreview(tx, ws)
     if (!preview) bad('The contract preview is not complete')
     if (b.snapshot_hash !== preview.hash) bad('The contract changed since you opened it. Reload and review it again.', 409)
-
-    if (party === 'client' && !nested) {
-      const settings = await getSettings(tx)
-      const rule = settings.multi_candidate_threshold
-      if (job.indicative_budget !== null && job.indicative_budget >= rule.amount) {
-        const [{ count }] = await tx`select count(*)::int as count from negotiation_workspaces where job_id = ${job.id} and reached_beyond_introduction`
-        if (count < rule.candidates) {
-          if (!b.override_multi_candidate) {
-            throw createError({
-              statusCode: 409,
-              statusMessage: `GoodCompany's fairness standard asks for at least ${rule.candidates} candidates on jobs of this size; you have ${count}.`,
-              data: { multi_candidate: { count, required: rule.candidates } },
-            })
-          }
-          await audit(tx, { event_type: 'multi_candidate_override', actor_id: user.id, workspace_id: ws.id, payload: { count, required: rule.candidates } })
-        }
-      }
-    }
 
     const grantId = await consumeStepUp(event, tx, user.id)
     const inserted = await tx`
@@ -86,11 +68,21 @@ export default defineEventHandler(async (event) => {
       values (${ws.id}, ${job.id}, ${ws.client_id}, ${ws.contractor_id}, ${ws.parent_contract_id}, ${preview.terms.id}, ${preview.quote.id},
               ${tx.json(s as never)}, ${preview.hash}, ${s.mediator.id}, ${s.quote.currency}, 'awaiting_funding')
       returning *`
+    // D29: order status per line of "materials bought from third parties" (from the contractor's full estimate).
+    const est = preview.quote.estimate
+    if (est) {
+      const thirdParty = new Set(est.sections.filter((x: any) => x.kind === 'third_party').map((x: any) => x.key))
+      let position = 0
+      for (const l of est.lines.filter((x: any) => x.kind === 'material' && thirdParty.has(x.section))) {
+        await tx`insert into contract_material_lines (contract_id, position, description, quantity, unit, amount)
+                 values (${contract.id}, ${++position}, ${l.description}, ${l.quantity}, ${l.unit}, ${l.amount})`
+      }
+    }
     for (const m of s.milestones) {
       await tx`insert into milestones (contract_id, sequence, kind, description, amount, evidence_required)
                values (${contract.id}, ${m.sequence}, ${m.kind}, ${m.description}, ${m.amount}, ${m.evidence_required})`
     }
-    await tx`update negotiation_workspaces set stage = 'closed', outcome = 'accepted', closed_at = now(), last_activity_at = now() where id = ${ws.id}`
+    await closeWorkspace(tx, ws, 'accepted', user.id)
     const siblings = nested ? [] : await tx`
       update negotiation_workspaces set stage = 'closed', outcome = 'closed_other_selected', closed_at = now()
        where job_id = ${job.id} and id <> ${ws.id} and outcome = 'pending' and parent_contract_id is null

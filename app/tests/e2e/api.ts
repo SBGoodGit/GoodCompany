@@ -2,6 +2,8 @@
 // The negotiation itself is covered through the UI in negotiation.spec.ts.
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import { quoteBreakdown } from '../../shared/terms'
+import { toMinor } from '../../shared/money'
 
 const base = () => process.env.APP_URL || 'http://127.0.0.1:3100'
 export const superuserDb = () => postgres(process.env.DATABASE_URL!, { max: 1 })
@@ -42,27 +44,49 @@ export async function creditBalance(email: string, amount: string) {
 type Party = { email: string; password: string; token?: string }
 
 /**
+ * An itemised quote (round 2) that reproduces a split given in percentages: one labour line per
+ * phase and one material line for the materials budget, so the escrow tests keep their numbers.
+ */
+export function estimateFor(total: string, phases: { kind: string; percentage: number; description: string }[], materialsPct: number) {
+  const b = quoteBreakdown(toMinor(total), { payment_phases: phases.map((p, i) => ({ ...p, sequence: i + 1, kind: p.kind as any, evidence_required: '' })), materials_budget_percentage: materialsPct }, 2)
+  const lines = b.phase_amounts.map((p) => ({ section: 'work', description: phases[p.sequence - 1].description, kind: 'labour', quantity: 1, unit: 'lump sum', unit_price: p.amount, phase: p.sequence }))
+  const sections: any[] = [{ key: 'work', title: 'Work', kind: 'general' }]
+  if (b.materials_budget_amount > 0) {
+    sections.push({ key: 'bought', title: 'Materials', kind: 'third_party' })
+    lines.push({ section: 'bought', description: 'Materials', kind: 'material', quantity: 1, unit: 'lump sum', unit_price: b.materials_budget_amount, phase: phases.length })
+  }
+  return { scope_of_work: 'As agreed in the intake.', detail_level: 'sections', sections, lines }
+}
+
+/** Round 2 negotiation up to an open quote stage: move in, intake with budget, contractor's terms accepted. */
+export async function toQuoteStage(client: Party, contractor: Party, jobId: string, terms: Record<string, any>, extraAnswers: Record<string, string> = {}) {
+  const ws = await call(contractor.token!, 'POST', `/api/jobs/${jobId}/responses`, { message: 'Hello' })
+  await call(client.token!, 'POST', `/api/workspaces/${ws.id}/advance`)
+  await call(client.token!, 'POST', `/api/workspaces/${ws.id}/intake`, { answers: { scope: 'Cabinets', location_access: 'Ground floor', ...extraAnswers }, budget_min: '5000', budget_max: '15000' })
+  await call(client.token!, 'POST', `/api/workspaces/${ws.id}/advance`)
+  const v = await call(contractor.token!, 'POST', `/api/workspaces/${ws.id}/terms-versions`, terms)
+  await call(client.token!, 'POST', `/api/workspaces/${ws.id}/terms-versions/${v.id}/accept`)
+  return ws
+}
+
+/**
  * Client posts a job; contractor negotiates terms (§7.1 shape by default: advance 10%, work 28%,
- * final 30%, materials 30%, fee 2%) and a quote; both sign. Returns the contract id.
+ * final 30%, materials 30%, fee 2%) and an itemised quote; both sign. Returns the contract id.
  */
 export async function signedContract(client: Party, contractor: Party, opts: { total?: string; warranty?: number; phases?: any[]; materials?: number } = {}) {
   client.token ??= await tokenFor(client)
   contractor.token ??= await tokenFor(contractor)
   const job = await call(client.token, 'POST', '/api/jobs', { title: `Escrow test job ${Date.now()}`, category: 'carpentry', region: 'Utrecht', description: 'Test' })
-  const ws = await call(contractor.token, 'POST', `/api/jobs/${job.id}/responses`, { message: 'Hello' })
-  await call(contractor.token, 'POST', `/api/workspaces/${ws.id}/advance`)
-  await call(client.token, 'POST', `/api/workspaces/${ws.id}/intake`, { answers: { scope: 'Cabinets', location_access: 'Ground floor' } })
-  await call(client.token, 'POST', `/api/workspaces/${ws.id}/advance`)
-  const v = await call(contractor.token, 'POST', `/api/workspaces/${ws.id}/terms-versions`, {
-    warranty_period_days: opts.warranty ?? 30, execution_period_days: 60, materials_budget_percentage: opts.materials ?? 30,
-    payment_phases: opts.phases ?? [
-      { kind: 'advance', percentage: 10, description: 'Advance', evidence_required: '' },
-      { kind: 'work', percentage: 28, description: 'Carcasses installed', evidence_required: 'Photos' },
-      { kind: 'final', percentage: 30, description: 'Delivery', evidence_required: 'Photos and walkthrough' },
-    ],
+  const phases = opts.phases ?? [
+    { kind: 'advance', percentage: 10, description: 'Advance', evidence_required: '' },
+    { kind: 'work', percentage: 28, description: 'Carcasses installed', evidence_required: 'Photos' },
+    { kind: 'final', percentage: 30, description: 'Delivery', evidence_required: 'Photos and walkthrough' },
+  ]
+  const ws = await toQuoteStage(client, contractor, job.id, {
+    warranty_period_days: opts.warranty ?? 30, execution_period_days: 60,
+    payment_phases: phases.map(({ percentage: _p, ...rest }: any) => rest),
   })
-  await call(client.token, 'POST', `/api/workspaces/${ws.id}/terms-versions/${v.id}/accept`)
-  await call(contractor.token, 'POST', `/api/workspaces/${ws.id}/quote`, { total_amount: opts.total ?? '10000', materials_amount: '2500' })
+  await call(contractor.token, 'POST', `/api/workspaces/${ws.id}/quote`, estimateFor(opts.total ?? '10000', phases, opts.materials ?? 30))
   await call(client.token, 'POST', `/api/workspaces/${ws.id}/quote/accept`)
   const view = await call(client.token, 'GET', `/api/workspaces/${ws.id}`)
   for (const u of [contractor, client]) {

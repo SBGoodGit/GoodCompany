@@ -2,7 +2,7 @@
 // (positive, negative, rejection), repair agreement, nested contract, mutual settlement.
 import { expect, test } from '@playwright/test'
 import { createUser } from './helpers'
-import { call, creditBalance, escrowAction, signedContract, stepUpToken, superuserDb, tokenFor } from './api'
+import { call, creditBalance, escrowAction, estimateFor, signedContract, stepUpToken, superuserDb, tokenFor } from './api'
 
 async function parties() {
   const client = await createUser('Cora Client', 'client')
@@ -89,11 +89,11 @@ test('repair agreement, then a nested contract after a part-payment', async () =
   const ws = await call(c.token, 'POST', `/api/contracts/${id}/nested`, { message: 'Add a pantry cabinet' })
   expect(ws.stage).toBe('terms')
   const v = await call(k.token, 'POST', `/api/workspaces/${ws.id}/terms-versions`, {
-    warranty_period_days: 15, execution_period_days: 10, materials_budget_percentage: 0,
-    payment_phases: [{ kind: 'final', percentage: 98, description: 'Pantry cabinet', evidence_required: 'Photo' }],
+    warranty_period_days: 15, execution_period_days: 10,
+    payment_phases: [{ kind: 'final', description: 'Pantry cabinet', evidence_required: 'Photo' }],
   })
   await call(c.token, 'POST', `/api/workspaces/${ws.id}/terms-versions/${v.id}/accept`)
-  await call(k.token, 'POST', `/api/workspaces/${ws.id}/quote`, { total_amount: '1500' })
+  await call(k.token, 'POST', `/api/workspaces/${ws.id}/quote`, estimateFor('1500', [{ kind: 'final', percentage: 98, description: 'Pantry cabinet' }], 0))
   await call(c.token, 'POST', `/api/workspaces/${ws.id}/quote/accept`)
   const view = await call(c.token, 'GET', `/api/workspaces/${ws.id}`)
   const sign = async (u: any) => call(u.token, 'POST', `/api/workspaces/${ws.id}/sign`, { snapshot_hash: view.preview.hash }, { 'x-step-up-token': await stepUpToken(u.token, u.password) })
