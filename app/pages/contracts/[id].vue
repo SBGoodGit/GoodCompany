@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { phaseView } from '~~/shared/estimate'
+import { MATERIAL_STATUSES, MATERIAL_STATUS_LABEL } from '~~/shared/materials'
 // Contract detail with the simulated escrow (§11 GoodTrade — Contracts and Escrow).
 // Every money action is prepared, summarised and signed with step-up; the ledger applies it
 // once all required parties have signed.
@@ -65,8 +66,7 @@ const evidence = reactive<Record<string, string>>({})
 const response = reactive<Record<string, { mode: string; amount: string; reason: string; question: string }>>({})
 const respFor = (rid: string) => (response[rid] ??= { mode: 'approve', amount: '', reason: '', question: '' })
 const answer = reactive<Record<string, string>>({})
-const supplier = reactive({ email: '', amount: '' })
-const materialsNote = ref('')
+const supplier = reactive<{ email: string; amount: string; lines: string[]; notConnected: boolean }>({ email: '', amount: '', lines: [], notConnected: false })
 const co = reactive<any>({ description: '', motivation: '', amount_delta: '', new_materials_budget: '', changes: {} as Record<string, string> })
 const coReject = reactive<Record<string, string>>({})
 const coMsg = reactive<Record<string, string>>({})
@@ -260,18 +260,34 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
       <button class="btn danger small" style="margin-top: 0.5rem" @click="doAction('object', { disputed_amount: warrantyObjection.amount, reason: warrantyObjection.reason }, 'Warranty objection recorded')">Object</button>
     </div>
 
-    <!-- Materials (contractor only for supplier payments) -->
-    <div v-if="status === 'active' || e.materials_status.length" class="card small">
-      <h3>Materials</h3>
-      <div v-for="(u, i) in e.materials_status" :key="i">Materials ordered · {{ new Date(u.created_at).toLocaleDateString() }} {{ u.note }}</div>
+    <!-- Materials: order status per third-party line (D29); supplier payments for the contractor only -->
+    <div v-if="e.material_lines.length || (isContractor && status === 'active')" class="card small" data-test="materials">
+      <h3>Materials bought from third parties</h3>
+      <p class="muted">Order status per line. {{ isClient ? 'You see the status only, never what was paid or where it was bought.' : 'Information only: no approval, window or trigger. A supplier payment sets its lines to ordered; set delivered yourself.' }}</p>
+      <table v-if="e.material_lines.length">
+        <tbody><tr v-for="l in e.material_lines" :key="l.id" :data-test="`material-line-${l.position}`">
+          <td>{{ l.description }}<span v-if="isContractor" class="muted"> · {{ l.quantity }} {{ l.unit }} · {{ money(l.amount) }}</span></td>
+          <td>
+            <select v-if="isContractor && ['active', 'completed'].includes(status)" :value="l.status" data-test="material-status"
+              @change="act(() => api(`/api/contracts/${id}/material-lines/${l.id}`, { method: 'POST', body: { status: ($event.target as HTMLSelectElement).value } }), 'Status updated')">
+              <option v-for="st in MATERIAL_STATUSES" :key="st" :value="st">{{ MATERIAL_STATUS_LABEL[st] }}</option>
+            </select>
+            <span v-else class="tag" :class="{ grey: l.status === 'not_ordered' }" data-test="material-status-tag">{{ MATERIAL_STATUS_LABEL[l.status] }}</span>
+          </td>
+        </tr></tbody>
+      </table>
       <template v-if="isContractor && status === 'active'">
-        <form class="row" @submit.prevent="act(() => api(`/api/contracts/${id}/materials-status`, { method: 'POST', body: { note: materialsNote } }), 'Status posted')">
-          <input v-model="materialsNote" placeholder="Note (optional)" style="flex: 1" /><button class="btn secondary small" type="submit" data-test="materials-ordered">Post "materials ordered"</button>
-        </form>
         <h4>Pay a supplier from the materials budget</h4>
-        <p class="muted">Signed by you alone. Paid in full to a verified GoodCompany account. The client is told a payment was made, without the amount.</p>
+        <p class="muted">Signed by you alone. Paid in full to a verified GoodCompany account. The client is told a payment was made, without the amount. Bought with your own money from a supplier without an account? Set the line to ordered instead; its budget stays in the escrow until the final payout.</p>
         <div class="grid2"><div><label>Supplier email</label><input v-model="supplier.email" type="email" data-test="supplier-email" /></div><div><label>Amount</label><input v-model="supplier.amount" inputmode="decimal" data-test="supplier-amount" /></div></div>
-        <button class="btn small" style="margin-top: 0.5rem" data-test="pay-supplier" @click="doAction('pay_supplier', { supplier_email: supplier.email, amount: supplier.amount }, 'Supplier paid')">Pay supplier</button>
+        <div v-if="e.material_lines.length" style="margin-top: 0.5rem">
+          <div>This payment is for:</div>
+          <label v-for="l in e.material_lines" :key="l.id" class="inline-check"><input v-model="supplier.lines" type="checkbox" :value="l.id" :data-test="`pay-line-${l.position}`" /> {{ l.description }}</label>
+        </div>
+        <label class="inline-check" style="margin-top: 0.5rem"><input v-model="supplier.notConnected" type="checkbox" data-test="supplier-not-connected" />
+          I confirm the supplier is not a company connected to me. Materials from a connected company count as my own supply, paid with the final payout.</label>
+        <button class="btn small" style="margin-top: 0.5rem" data-test="pay-supplier" :disabled="!supplier.notConnected"
+          @click="doAction('pay_supplier', { supplier_email: supplier.email, amount: supplier.amount, material_line_ids: supplier.lines, supplier_not_connected: supplier.notConnected }, 'Supplier paid')">Pay supplier</button>
         <table v-if="e.supplier_payments.length" style="margin-top: 0.5rem"><tbody><tr v-for="(p, i) in e.supplier_payments" :key="i"><td>{{ p.supplier_email }}</td><td>{{ money(p.amount) }}</td><td>{{ new Date(p.signed_at).toLocaleDateString() }}</td></tr></tbody></table>
       </template>
     </div>

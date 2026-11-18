@@ -81,7 +81,12 @@ export async function buildContractPreview(tx: Tx, ws: any) {
   const phases = [...terms.payment_phases].sort((a: any, b: any) => a.sequence - b.sequence)
   const amountBySeq = new Map<number, number>(quote.phase_amounts.map((p: any) => [p.sequence, p.amount]))
   const pctBySeq = new Map<number, number | null>(quote.phase_amounts.map((p: any) => [p.sequence, p.percentage ?? null]))
-  const holdback = holdbackOf(quote.total_amount, terms.holdback_percentage)
+  // D29: a material-only delivery (no work, subcontracted work or equipment lines) has no holdback.
+  const holdbackPct = quote.estimate?.holdback_applies === false ? 0 : terms.holdback_percentage
+  const holdback = holdbackOf(quote.total_amount, holdbackPct)
+  const clauses = holdbackPct > 0 ? terms.mandatory_clauses : terms.mandatory_clauses.map((c: any) => c.key !== 'holdback_reservation' ? c : {
+    ...c, text: 'This is a material-only delivery: no holdback applies (D29). The full amount stays in escrow until the client approves the delivery.',
+  })
   const snapshot = {
     format: 'goodcompany-contract-v1',
     workspace_id: ws.id,
@@ -98,12 +103,12 @@ export async function buildContractPreview(tx: Tx, ws: any) {
       ownership_terms: terms.ownership_terms,
       cancellation_terms: terms.cancellation_terms,
       warranty_period_days: terms.warranty_period_days,
-      holdback_percentage: terms.holdback_percentage,
+      holdback_percentage: holdbackPct,
       execution_period_days: terms.execution_period_days,
       materials_budget_percentage: quote.estimate ? quote.estimate.materials_percentage ?? null : terms.materials_budget_percentage,
       fee_percentage: terms.fee_percentage,
       payment_phases: phases.map((p: any) => ({ ...p, percentage: pctBySeq.get(p.sequence) ?? p.percentage ?? null })),
-      mandatory_clauses: terms.mandatory_clauses,
+      mandatory_clauses: clauses,
     },
     quote: {
       id: quote.id,
@@ -125,8 +130,9 @@ export async function buildContractPreview(tx: Tx, ws: any) {
       amount: amountBySeq.get(p.sequence) ?? 0,
     })),
     holdback_amount: holdback,
-    holdback_notice:
-      'The holdback is a motivation amount, not insurance. If repair costs exceed the remaining holdback, the contractor bears the excess outside the platform, and the contractor never has to top up the escrow.',
+    holdback_notice: holdbackPct === 0
+      ? 'Material-only delivery: there is no holdback. The amount stays frozen in the escrow until the client approves the delivery.'
+      : 'The holdback is a motivation amount, not insurance. If repair costs exceed the remaining holdback, the contractor bears the excess outside the platform, and the contractor never has to top up the escrow.',
   }
   return { snapshot, hash: hashCanonical(snapshot), terms, quote }
 }

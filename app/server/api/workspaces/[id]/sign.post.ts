@@ -68,6 +68,16 @@ export default defineEventHandler(async (event) => {
       values (${ws.id}, ${job.id}, ${ws.client_id}, ${ws.contractor_id}, ${ws.parent_contract_id}, ${preview.terms.id}, ${preview.quote.id},
               ${tx.json(s as never)}, ${preview.hash}, ${s.mediator.id}, ${s.quote.currency}, 'awaiting_funding')
       returning *`
+    // D29: order status per line of "materials bought from third parties" (from the contractor's full estimate).
+    const est = preview.quote.estimate
+    if (est) {
+      const thirdParty = new Set(est.sections.filter((x: any) => x.kind === 'third_party').map((x: any) => x.key))
+      let position = 0
+      for (const l of est.lines.filter((x: any) => x.kind === 'material' && thirdParty.has(x.section))) {
+        await tx`insert into contract_material_lines (contract_id, position, description, quantity, unit, amount)
+                 values (${contract.id}, ${++position}, ${l.description}, ${l.quantity}, ${l.unit}, ${l.amount})`
+      }
+    }
     for (const m of s.milestones) {
       await tx`insert into milestones (contract_id, sequence, kind, description, amount, evidence_required)
                values (${contract.id}, ${m.sequence}, ${m.kind}, ${m.description}, ${m.amount}, ${m.evidence_required})`

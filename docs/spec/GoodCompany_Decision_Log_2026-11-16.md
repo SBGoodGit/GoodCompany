@@ -13,6 +13,9 @@
 <!-- v1.010 (17-11-2026): O24 en O26 besloten (reactietermijn alleen voor volledige oplevering; holdback ook bij 0 dagen garantie); O25 uitgesteld -->
 <!-- v1.011 (17-11-2026): Build Spec v3.007 geaccepteerd door de product owner -->
 <!-- v1.012 (17-11-2026): D27 toegevoegd: correcties na de MVP1-bouw -->
+<!-- v1.013 (18-11-2026): D28 toegevoegd: richting voor offertes en kandidaten na Sanders test van de build -->
+<!-- v1.014 (18-11-2026): D29 toegevoegd: zelf geleverd materiaal in de eindfase, materiaalleveringen zonder holdback -->
+<!-- v1.015 (18-11-2026): D29 aangevuld met bestelstatus per materiaalregel -->
 
 Decisions taken by the product owner on 16 and 17 November 2026, after the project review (`claude/GoodCompany_Project_Review_2026-11-16.md`). Status labels follow the project taxonomy. All entries up to v1.010 are processed in Build Spec v3.008, which the product owner accepted on 17 November 2026 (`claude/GoodCompany_MVP1_Build_Spec_v3.md`); the Codex and registries are not yet updated. This log is leading where it differs from the Build Spec or from the Claude doc "GoodCompany Escrow Protocol v1 — Architecture Proposal" (https://claude.ai/artifact/FzDsNXBC38ZSkJQ7Xuyrik).
 
@@ -156,6 +159,25 @@ One currency per contract, EUR as default, no FX conversion in MVP1. Within D5.
 - OD5: a loan application gets an administrative check before it goes to a vote. The administrator checks only completeness, required data and formal conditions, never whether the loan is desirable or how members should vote.
 - OD6–OD9 stay as built, **provisionally**, and need further product work: voters do not see identities (OD6); multi-candidate rule as a warning, not a block (OD7); sequential invoice numbers (OD8); simple interest (OD9). They are not final product decisions.
 - Completion evidence is text only in MVP1. Photo and file uploads are a planned extension.
+
+**D28 — Estimates and candidates: direction after testing the build.** (18 November 2026)
+Direction for the next build round, worked out in `GoodCompany_Proposal_Modular_Contracts.md` (v0.204). Includes the client tools of proposal §6.5: pause new applicants, conversation overview, private notes per candidate. Not yet in Build Spec v3.008.
+- **The contractor owns the plan.** The contractor drafts the scope, estimate, payment phases, materials and acceptance terms. The client accepts, rejects or asks for a revision with a comment, and never edits the plan or makes counter-versions. The client states constraints: the period in which the work can be done, available days, access and logistics on location. Reason: when the client decides price or method, the cheapest route wins and quality suffers.
+- **Budget question in the technical intake.** No price in the job listing or search. After the introduction the technical intake runs in both directions and contains one mandatory question to the client: the budget, minimum and maximum. **This revises Decision 10.3 (Variant C)**; Sander accepts the anchoring risk because the budget appears only after first contact.
+- **Each estimate covers the whole job.** No section-by-section comparison of estimates across candidates.
+- **Detail level:** the contractor chooses whether to show unit prices; default totals per section. Purchase prices and margin stay hidden (D12).
+- **Candidates per job.** Introduction unlimited. At most 3 candidates at a time in the technical intake and terms; at most 2 swaps per job there (5 in total); at most 3 quotes. When the client accepts the terms, the platform warns that the contractor will now spend time on a quote. No rejection fee. Replaces the minimum of 5 candidates (Build Spec v2 §6.7, OD7) and limits Codex Marketplace clause 3.
+
+**D29 — Own-supply materials and material-only deliveries.** (18 November 2026; refines O17 and D25)
+- **Origin per material line.** In the quote the contractor puts material lines in one of two kinds of section: *materials supplied by the contractor* (own stock, own production, or bought and resold by the contractor himself) or *materials bought from third parties*. The origin rests on the contractor's declaration in how he builds the quote; materials from a company connected to the contractor count as own supply.
+- **Materials bought from third parties** form the materials budget, paid directly from the escrow to a verified supplier, as before. The fee never reduces this budget.
+- **Own-supply materials** are not part of the materials budget. They count in the **final phase** and are paid with the final payout, never earlier. No advance on own-supply materials, and no route around the materials protection through an own-supplier construction. Same timing and protection as O17; only the classification changes.
+- **Material-only delivery.** A contract that is only a delivery of materials is possible. The delivery is the full delivery: the contractor submits the final completion request with proof of delivery, the 14-day response window applies, then the mediator triggers. The 2% fee applies.
+- **No holdback on a material-only delivery.** The amount stays frozen in the escrow until the client approves the delivery, so a holdback adds nothing. The mandatory 10% holdback (D25) applies to contracts with completed work to review, with or without materials. The rule that the final phase is at least 10% applies only when a holdback applies.
+- **Removes** the build rule that every phase needs at least one line that is not material (BUILD_NOTES, round 2). New rule: every phase has an amount above zero, from work lines or own-supply material lines.
+- **Open, for research:** how the origin of materials can be verified beyond the contractor's declaration. Until then: trust, the fraud rule of D12, and the declaration that a supplier is not connected.
+- **Order status per material line** (added v1.015). Each line in *materials bought from third parties* has a status: not ordered, ordered, delivered. The contractor sets it; the client sees only the status, never the amount paid or the route. A supplier payment from the escrow is linked to one or more lines and sets them to *ordered*; a payment never sets *delivered*. If the contractor buys with his own money from a supplier without a GoodCompany account, he sets the line to *ordered* without a payment; the budget for that line stays in the escrow until the final payout (P21). The status is information only: no approval, window or trigger (O20). Replaces the contract-wide `materials_ordered` status.
+- OD3 (no cap on advances on work) is unchanged.
 
 ## Awaiting the product owner's decision
 

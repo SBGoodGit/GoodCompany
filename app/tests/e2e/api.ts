@@ -50,15 +50,19 @@ type Party = { email: string; password: string; token?: string }
 export function estimateFor(total: string, phases: { kind: string; percentage: number; description: string }[], materialsPct: number) {
   const b = quoteBreakdown(toMinor(total), { payment_phases: phases.map((p, i) => ({ ...p, sequence: i + 1, kind: p.kind as any, evidence_required: '' })), materials_budget_percentage: materialsPct }, 2)
   const lines = b.phase_amounts.map((p) => ({ section: 'work', description: phases[p.sequence - 1].description, kind: 'labour', quantity: 1, unit: 'lump sum', unit_price: p.amount, phase: p.sequence }))
-  if (b.materials_budget_amount > 0) lines.push({ section: 'work', description: 'Materials', kind: 'material', quantity: 1, unit: 'lump sum', unit_price: b.materials_budget_amount, phase: phases.length })
-  return { scope_of_work: 'As agreed in the intake.', detail_level: 'sections', sections: [{ key: 'work', title: 'Work' }], lines }
+  const sections: any[] = [{ key: 'work', title: 'Work', kind: 'general' }]
+  if (b.materials_budget_amount > 0) {
+    sections.push({ key: 'bought', title: 'Materials', kind: 'third_party' })
+    lines.push({ section: 'bought', description: 'Materials', kind: 'material', quantity: 1, unit: 'lump sum', unit_price: b.materials_budget_amount, phase: phases.length })
+  }
+  return { scope_of_work: 'As agreed in the intake.', detail_level: 'sections', sections, lines }
 }
 
 /** Round 2 negotiation up to an open quote stage: move in, intake with budget, contractor's terms accepted. */
-export async function toQuoteStage(client: Party, contractor: Party, jobId: string, terms: Record<string, any>) {
+export async function toQuoteStage(client: Party, contractor: Party, jobId: string, terms: Record<string, any>, extraAnswers: Record<string, string> = {}) {
   const ws = await call(contractor.token!, 'POST', `/api/jobs/${jobId}/responses`, { message: 'Hello' })
   await call(client.token!, 'POST', `/api/workspaces/${ws.id}/advance`)
-  await call(client.token!, 'POST', `/api/workspaces/${ws.id}/intake`, { answers: { scope: 'Cabinets', location_access: 'Ground floor' }, budget_min: '5000', budget_max: '15000' })
+  await call(client.token!, 'POST', `/api/workspaces/${ws.id}/intake`, { answers: { scope: 'Cabinets', location_access: 'Ground floor', ...extraAnswers }, budget_min: '5000', budget_max: '15000' })
   await call(client.token!, 'POST', `/api/workspaces/${ws.id}/advance`)
   const v = await call(contractor.token!, 'POST', `/api/workspaces/${ws.id}/terms-versions`, terms)
   await call(client.token!, 'POST', `/api/workspaces/${ws.id}/terms-versions/${v.id}/accept`)

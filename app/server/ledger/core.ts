@@ -236,13 +236,15 @@ export function applyAction(input: LedgerState, action: Action, signers: string[
       const sup = s.users[p.supplier_id]
       if (!sup || sup.status !== 'active' || !sup.verified) reject('The supplier needs a verified GoodCompany account')
       if (sup.id === c.client_id || sup.id === c.contractor_id) reject('A supplier payment cannot go to the client or the contractor (self-supply is paid at the final payout)')
+      // D29: materials from a company connected to the contractor count as own supply, paid at the final payout.
+      if (p.supplier_not_connected !== true) reject('Confirm that the supplier is not a company connected to you; materials from a connected company count as own supply, paid with the final payout')
       if (amount > unspentMaterials(a)) reject('The amount exceeds what is left of the materials budget')
       assertRelease(amount)
       a.paid_to_suppliers += amount
       credit(sup.id, amount)
       s.supplierPayments.push({ id: ctx.newId(), supplier_id: sup.id, amount, signed_by: c.contractor_id, signed_at: nowIso })
       record('supplier_payment', { to_supplier: amount })
-      summary = `Pay ${money(amount)} from the materials budget to the supplier, in full. No fee applies.`
+      summary = `Pay ${money(amount)} from the materials budget to the supplier, in full. No fee applies. You confirm the supplier is not a company connected to you.`
       notices.push({ user_id: c.client_id, title: 'The contractor paid a supplier from the materials budget' }) // no amount (P23)
       notices.push({ user_id: sup.id, title: 'You received a supplier payment (simulated)' })
       break

@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   const quotes = quoteRows.map((q: any) => ({
     ...q,
     estimate: q.estimate && party === 'client'
-      ? { ...estimateView(q.estimate.sections, q.estimate.lines, q.detail_level as DetailLevel), materials_percentage: q.estimate.materials_percentage, fee_percentage: q.estimate.fee_percentage }
+      ? { ...estimateView(q.estimate.sections, q.estimate.lines, q.detail_level as DetailLevel), materials_percentage: q.estimate.materials_percentage, fee_percentage: q.estimate.fee_percentage, holdback_applies: q.estimate.holdback_applies }
       : q.estimate,
   }))
   const preview = ws.stage === 'contract_preview' || ws.outcome === 'accepted' ? await buildContractPreview(sql, ws) : null

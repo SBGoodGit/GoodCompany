@@ -19,12 +19,12 @@ const ctx = (now = T0): ApplyContext => ({
 })
 
 /** 10,000.00 contract: advance 1,000, work 2,800, final 3,000, materials budget 3,000, fee 200 (§7.1). */
-function state(over: { warranty?: number; materials?: number; milestones?: [string, number][]; fee?: number; total?: number } = {}): LedgerState {
+function state(over: { warranty?: number; materials?: number; milestones?: [string, number][]; fee?: number; total?: number; holdback?: number } = {}): LedgerState {
   const ms = over.milestones ?? [['advance', 100_000], ['work', 280_000], ['final', 300_000]]
   return {
     contract: {
       id: 'k1', status: 'awaiting_funding', client_id: CLIENT, contractor_id: CONTRACTOR, mediator_id: MEDIATOR, currency: 'EUR',
-      snapshot_hash: 'abc', warranty_period_days: over.warranty ?? 30, holdback_percentage: 10,
+      snapshot_hash: 'abc', warranty_period_days: over.warranty ?? 30, holdback_percentage: over.holdback ?? 10,
       total_amount: over.total ?? 1_000_000, fee_amount: over.fee ?? 20_000, materials_budget_amount: over.materials ?? 300_000,
     },
     account: null,
@@ -57,12 +57,12 @@ const openRequest = (s: LedgerState) => s.requests.find((r) => r.status === 'ope
 function stateFromEstimate() {
   const phases = [{ sequence: 1, kind: 'advance' as const, description: 'Advance' }, { sequence: 2, kind: 'work' as const, description: 'Rough work' }, { sequence: 3, kind: 'final' as const, description: 'Delivery' }]
   const e = computeEstimate({
-    sections: [{ key: 'prep', title: 'Preparation' }, { key: 'build', title: 'Build' }],
+    sections: [{ key: 'prep', title: 'Preparation' }, { key: 'build', title: 'Build' }, { key: 'bought', title: 'Timber', kind: 'third_party' }],
     lines: [
       { section: 'prep', description: 'Planning and mobilisation', kind: 'labour', quantity: 1, unit: 'lump sum', unit_price: 100_000, phase: 1 },
       { section: 'build', description: 'Rough work', kind: 'labour', quantity: 40, unit: 'hour', unit_price: 7_000, phase: 2 },
       { section: 'build', description: 'Finishing and delivery', kind: 'labour', quantity: 50, unit: 'hour', unit_price: 6_000, phase: 3 },
-      { section: 'build', description: 'Timber and fixings', kind: 'material', quantity: 1, unit: 'lump sum', unit_price: 300_000, phase: 2 },
+      { section: 'bought', description: 'Timber and fixings', kind: 'material', quantity: 1, unit: 'lump sum', unit_price: 300_000, phase: 2 },
     ],
   }, phases, { feePercentage: 2, holdbackPercentage: 10 })
   expect(e.errors).toEqual([])
@@ -79,8 +79,8 @@ describe('§7.1 worked example', () => {
     expect(s.account!.fee_reserved).toBe(20_000)
     expect(s.account!.materials_budget).toBe(300_000)
     s = go(s, 'claim_advance', { milestone_id: 'm1' })
-    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 200_000 })
-    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 60_000 })
+    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 200_000, supplier_not_connected: true })
+    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 60_000, supplier_not_connected: true })
     s = go(s, 'request_completion', { milestone_id: 'm2', evidence_text: 'Rough work done, photos attached' })
     s = go(s, 'approve', { completion_request_id: openRequest(s).id })
     s = go(s, 'request_completion', { milestone_id: 'm3', evidence_text: 'All done' })
@@ -128,12 +128,13 @@ describe('advance and supplier payments (P10, P23)', () => {
   })
   it('supplier payments: contractor alone, verified supplier, within budget, never to a party', () => {
     const s = go(state(), 'fund')
-    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 1 }, { signers: [CLIENT] })).toThrow()
-    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 300_001 })).toThrow(/materials budget/)
-    expect(() => run(s, 'pay_supplier', { supplier_id: CONTRACTOR, amount: 1 })).toThrow(/cannot go to the client or the contractor/)
+    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 1, supplier_not_connected: true }, { signers: [CLIENT] })).toThrow()
+    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 300_001, supplier_not_connected: true })).toThrow(/materials budget/)
+    expect(() => run(s, 'pay_supplier', { supplier_id: CONTRACTOR, amount: 1, supplier_not_connected: true })).toThrow(/cannot go to the client or the contractor/)
     const unverified = structuredClone(s); unverified.users[SUPPLIER].verified = false
-    expect(() => run(unverified, 'pay_supplier', { supplier_id: SUPPLIER, amount: 1 })).toThrow(/verified/)
-    const r = run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 300_000 })
+    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 1 })).toThrow(/not a company connected to you/) // D29 declaration
+    expect(() => run(unverified, 'pay_supplier', { supplier_id: SUPPLIER, amount: 1, supplier_not_connected: true })).toThrow(/verified/)
+    const r = run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 300_000, supplier_not_connected: true })
     expect(r.state.account!.fee_reserved).toBe(20_000) // no fee on supplier payments
     const clientNotice = r.notices.find((n) => n.user_id === CLIENT)!
     expect(clientNotice.title + (clientNotice.body ?? '')).not.toMatch(/\d/) // no amount for the client
@@ -385,7 +386,7 @@ describe('holdback always 10% (§3.4, D25, D27)', () => {
   it('withholds the full 10% even when the final phase is exactly 10% and no materials are left', () => {
     // 10,000.00: advance 1,000, work 6,800, final 1,000 (10%), materials 1,000 fully spent, fee 200
     let s = go(state({ materials: 100_000, milestones: [['advance', 100_000], ['work', 680_000], ['final', 100_000]] }), 'fund')
-    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 100_000 }, { actor: CONTRACTOR })
+    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 100_000, supplier_not_connected: true }, { actor: CONTRACTOR })
     s = go(s, 'claim_advance', { milestone_id: 'm1' })
     s = go(s, 'request_completion', { milestone_id: 'm2', evidence_text: 'x' })
     s = go(s, 'approve', { completion_request_id: openRequest(s).id })
@@ -395,6 +396,59 @@ describe('holdback always 10% (§3.4, D25, D27)', () => {
     expect(s.account!.holdback_amount).toBe(100_000)
     expect(s.account!.holdback_tranches.reduce((x, t) => x + t.amount, 0)).toBe(100_000)
     expect(escrowBalance(s.account!)).toBe(100_000)
+  })
+})
+
+describe('own-supply materials and material-only deliveries (round 2b, D29)', () => {
+  const phasesFinal = [{ sequence: 1, kind: 'final' as const, description: 'Delivery' }]
+  it('a material-only delivery has no holdback: the final approval pays everything and the contract closes', () => {
+    const e = computeEstimate({
+      sections: [{ key: 'm', title: 'Tiles', kind: 'third_party' }, { key: 'o', title: 'Own stock', kind: 'own_supply' }, { key: 't', title: 'Transport' }],
+      lines: [
+        { section: 'm', description: 'Roof tiles', kind: 'material', quantity: 400, unit: 'piece', unit_price: 2_500, phase: 1 },
+        { section: 'o', description: 'Ridge tiles', kind: 'material', quantity: 20, unit: 'piece', unit_price: 500, phase: 1 },
+        { section: 't', description: 'Delivery to site', kind: 'transport', quantity: 1, unit: 'trip', unit_price: 5_000, phase: 1 },
+      ],
+    }, phasesFinal, { feePercentage: 2, holdbackPercentage: 10 })
+    expect(e.errors).toEqual([])
+    let s = go(state({ total: e.total_amount, fee: e.fee_amount, materials: e.materials_budget_amount, milestones: [['final', e.phase_amounts[0].amount]], holdback: e.holdback_percentage }), 'fund')
+    expect(s.account!.holdback_amount).toBe(0)
+    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 950_000, supplier_not_connected: true })
+    s = go(s, 'request_completion', { milestone_id: 'm1', evidence_text: 'Delivery note signed on site' })
+    const r = openRequest(s)
+    expect(r.requested_amount).toBe(15_000 + 50_000) // transport + own supply, plus unspent materials (P21); nothing withheld
+    expect(r.response_due_at).not.toBeNull() // the 14-day window applies as for any final delivery
+    s = go(s, 'approve', { completion_request_id: r.id })
+    expect(s.account!.holdback_tranches).toEqual([])
+    expect(s.balances[CONTRACTOR]).toBe(65_000)
+    expect(s.balances[SUPPLIER]).toBe(950_000)
+    expect(s.account!.fee_transferred).toBe(e.fee_amount) // the 2% fee applies
+    expect(escrowBalance(s.account!)).toBe(0)
+    expect(s.contract.status).toBe('closed')
+  })
+  it('mixed contract: own-supply in the final payout, third-party from the budget, escrow empties to the cent', () => {
+    const phases = [{ sequence: 1, kind: 'advance' as const, description: 'Advance' }, { sequence: 2, kind: 'final' as const, description: 'Delivery' }]
+    const e = computeEstimate({
+      sections: [{ key: 'w', title: 'Work' }, { key: 'm', title: 'Bought', kind: 'third_party' }, { key: 'o', title: 'Own', kind: 'own_supply' }],
+      lines: [
+        { section: 'w', description: 'Planning', kind: 'labour', quantity: 1, unit: 'lump sum', unit_price: 50_001, phase: 1 },
+        { section: 'w', description: 'Fitting', kind: 'labour', quantity: 33.5, unit: 'hour', unit_price: 6_333, phase: 2 },
+        { section: 'm', description: 'Worktop', kind: 'material', quantity: 1, unit: 'piece', unit_price: 123_457, phase: 2 },
+        { section: 'o', description: 'Shelves from own workshop', kind: 'material', quantity: 3, unit: 'piece', unit_price: 11_111, phase: 2 },
+      ],
+    }, phases, { feePercentage: 2, holdbackPercentage: 10 })
+    expect(e.errors).toEqual([])
+    expect(e.phase_amounts[1].amount).toBe(Math.round(33.5 * 6_333) + 33_333) // fitting + own supply
+    let s = go(state({ total: e.total_amount, fee: e.fee_amount, materials: e.materials_budget_amount, milestones: e.phase_amounts.map((p) => [p.kind, p.amount] as [string, number]), warranty: 15 }), 'fund')
+    s = go(s, 'claim_advance', { milestone_id: 'm1' })
+    s = go(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 120_000, supplier_not_connected: true })
+    s = go(s, 'request_completion', { milestone_id: 'm2', evidence_text: 'Fitted' })
+    s = go(s, 'approve', { completion_request_id: openRequest(s).id })
+    s = go(s, 'claim_holdback_tranche', { sequence: 1 }, { now: new Date(T0.getTime() + 15 * DAY) })
+    expect(s.balances[SUPPLIER]).toBe(120_000)
+    expect(s.balances[CONTRACTOR] + s.balances[SUPPLIER] + s.account!.fee_transferred).toBe(e.total_amount)
+    expect(escrowBalance(s.account!)).toBe(0)
+    expect(s.contract.status).toBe('closed')
   })
 })
 
@@ -460,7 +514,7 @@ describe('atomicity', () => {
   it('a rejected action leaves the input state untouched', () => {
     const s = go(state(), 'fund')
     const snapshot = JSON.stringify(s)
-    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 999_999 })).toThrow()
+    expect(() => run(s, 'pay_supplier', { supplier_id: SUPPLIER, amount: 999_999, supplier_not_connected: true })).toThrow()
     expect(JSON.stringify(s)).toBe(snapshot)
   })
 })

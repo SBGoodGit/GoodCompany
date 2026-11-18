@@ -85,3 +85,17 @@ Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_Ronde2.md` (D28). Choices in `BUI
 
 **Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
 
+## Round 2b — 18 November 2026
+
+Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_Ronde2b.md` (D29). Decision Log v1.015 copied to `docs/spec/`. Choices in `BUILD_NOTES.md` 98–102.
+
+- Three section kinds; own-supply materials in the final phase (refused earlier), third-party materials in the materials budget.
+- Phase rule: every phase an amount above zero from work or own-supply lines.
+- Material-only delivery: no holdback, no tranches; final ≥ 10% only when a holdback applies.
+- Supplier declaration on every supplier payment (ledger condition).
+- Order status per third-party material line; a supplier payment sets its lines to ordered; replaces the contract-wide `materials_ordered` status. Migration `20261122000001_round2b.sql`.
+
+**Tests:** 95 Vitest + 14 Playwright, all passing; §7.1 unchanged. `npm run build` succeeds.
+
+**Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
+

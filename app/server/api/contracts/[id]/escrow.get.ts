@@ -2,6 +2,7 @@
 // paid_to_suppliers and the materials split are omitted, and the balance is shown excluding the
 // materials budget (§5.4, §7.3). All balances are simulated.
 import { contractValue, escrowBalance, unspentMaterials } from '../../../ledger/core'
+import { clientMaterialView } from '../../../../shared/materials'
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
@@ -22,7 +23,10 @@ export default defineEventHandler(async (event) => {
                                 where m.change_order_id in (select id from change_orders where contract_id = ${id}) order by m.created_at`
   const infoMessages = await sql`select m.* from completion_request_messages m join completion_requests r on r.id = m.completion_request_id
                                   where r.contract_id = ${id} order by m.created_at`
-  const materials = await sql`select status, note, created_at from materials_status_updates where contract_id = ${id} order by created_at desc`
+  // D29: order status per third-party material line. The client sees description and status only.
+  const lineRows = await sql`select id, position, description, quantity::float8 as quantity, unit, amount, status from contract_material_lines
+                              where contract_id = ${id} order by position`
+  const materialLines = party === 'client' ? clientMaterialView(lineRows as any) : lineRows
   const supplierPayments = party === 'contractor'
     ? await sql`select s.amount, s.signed_at, s.delivery_status, u.email as supplier_email from supplier_payments s join users u on u.id = s.supplier_id
                  where s.contract_id = ${id} order by s.signed_at desc`
@@ -57,7 +61,7 @@ export default defineEventHandler(async (event) => {
     change_orders: changeOrders,
     change_order_messages: coMessages,
     information_messages: infoMessages,
-    materials_status: materials,
+    material_lines: materialLines,
     supplier_payments: supplierPayments,
     nested_contracts: nested,
     nested_workspaces: nestedWorkspaces,

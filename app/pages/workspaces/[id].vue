@@ -3,7 +3,7 @@
 // answers the intake (with the budget range), states constraints, accepts or responds to the terms,
 // and accepts the itemised quote. The contractor proposes terms and builds the estimate.
 import { validateTerms } from '~~/shared/terms'
-import { computeEstimate, LINE_KINDS, type EstimateLineInput } from '~~/shared/estimate'
+import { computeEstimate, LINE_KINDS, SECTION_KINDS, SECTION_KIND_LABEL, type EstimateLineInput } from '~~/shared/estimate'
 import { toMinor } from '~~/shared/money'
 
 const api = useApi()
@@ -130,15 +130,26 @@ function loadEstimate() {
   } else if (!quoteForm.sections.length) addSection()
   estimateLoaded = true
 }
-function addSection() { sectionSeq++; quoteForm.sections.push({ key: `s${Date.now().toString(36)}${sectionSeq}`, title: '' }) }
+function addSection() { sectionSeq++; quoteForm.sections.push({ key: `s${Date.now().toString(36)}${sectionSeq}`, title: '', kind: 'general' }) }
+const finalPhase = computed(() => acceptedTerms.value?.payment_phases.find((p: any) => p.kind === 'final')?.sequence ?? 1)
+const sectionKind = (key: string) => quoteForm.sections.find((x: any) => x.key === key)?.kind ?? 'general'
+/** D29: material sections hold material lines only; own-supply materials are paid with the final phase. */
+function setSectionKind(sec: any, kind: string) {
+  sec.kind = kind
+  for (const l of linesOf(sec.key)) {
+    if (kind !== 'general') l.kind = 'material'
+    else if (l.kind === 'material') l.kind = 'labour'
+    if (kind === 'own_supply') l.phase = finalPhase.value
+  }
+}
 function removeSection(i: number) {
   const key = quoteForm.sections[i].key
   quoteForm.sections.splice(i, 1)
   quoteForm.lines = quoteForm.lines.filter((l: any) => l.section !== key)
 }
 function addLine(section: string) {
-  const phases = acceptedTerms.value?.payment_phases ?? []
-  quoteForm.lines.push({ section, description: '', kind: 'labour', quantity: '1', unit: 'hour', unit_price: '', phase: phases[phases.length - 1]?.sequence ?? 1, note: '' })
+  const k = sectionKind(section)
+  quoteForm.lines.push({ section, description: '', kind: k === 'general' ? 'labour' : 'material', quantity: '1', unit: k === 'general' ? 'hour' : 'piece', unit_price: '', phase: finalPhase.value, note: '' })
 }
 const removeLine = (l: any) => { quoteForm.lines = quoteForm.lines.filter((x: any) => x !== l) }
 const linesOf = (key: string) => quoteForm.lines.filter((l: any) => l.section === key)
@@ -382,18 +393,19 @@ const advance = () => act(() => post('/advance'))
           <table v-if="submittedQuote.estimate.detail_level === 'lines'" data-test="estimate-lines">
             <thead><tr><th>Section</th><th>Description</th><th>Kind</th><th>Quantity</th><th>Unit price</th><th>Amount</th><th>Phase</th></tr></thead>
             <tbody><tr v-for="(l, i) in submittedQuote.estimate.lines" :key="i">
-              <td>{{ submittedQuote.estimate.sections.find((s: any) => s.key === l.section)?.title }}</td><td>{{ l.description }}<div v-if="l.note" class="muted">{{ l.note }}</div></td>
+              <td>{{ submittedQuote.estimate.sections.find((s: any) => s.key === l.section)?.title }}<div class="muted">{{ SECTION_KIND_LABEL[submittedQuote.estimate.sections.find((s: any) => s.key === l.section)?.kind ?? 'general'] }}</div></td><td>{{ l.description }}<div v-if="l.note" class="muted">{{ l.note }}</div></td>
               <td>{{ l.kind }}</td><td>{{ l.quantity }} {{ l.unit }}</td><td>{{ money(l.unit_price) }}</td><td>{{ money(l.amount) }}</td><td>{{ l.phase }}</td>
             </tr></tbody>
           </table>
           <table v-else data-test="estimate-sections">
-            <thead><tr><th>Section</th><th>Amount</th></tr></thead>
-            <tbody><tr v-for="s in submittedQuote.estimate.sections" :key="s.key"><td>{{ s.title }}</td><td>{{ money(s.amount) }}</td></tr></tbody>
+            <thead><tr><th>Section</th><th>Kind</th><th>Amount</th></tr></thead>
+            <tbody><tr v-for="s in submittedQuote.estimate.sections" :key="s.key"><td>{{ s.title }}</td><td class="muted">{{ SECTION_KIND_LABEL[s.kind ?? 'general'] }}</td><td>{{ money(s.amount) }}</td></tr></tbody>
           </table>
         </template>
         <div class="info">
           <div v-for="p in submittedQuote.phase_amounts" :key="p.sequence">Phase {{ p.sequence }} ({{ p.kind }}): {{ money(p.amount) }}<span v-if="p.percentage !== undefined"> · {{ p.percentage }}%</span></div>
-          <div>Materials budget (materials at selling price): {{ money(submittedQuote.materials_budget_amount) }}</div>
+          <div>Materials budget (materials bought from third parties, at selling price): {{ money(submittedQuote.materials_budget_amount) }}</div>
+          <div v-if="submittedQuote.estimate?.holdback_applies === false" data-test="delivery-note">Material-only delivery: no holdback. The amount stays in the escrow until you approve the delivery.</div>
           <div>Platform fee ({{ acceptedTerms?.fee_percentage }}%), frozen at funding: {{ money(submittedQuote.fee_amount) }}</div>
           <div>Total contract amount (what the client deposits): <b data-test="quote-total">{{ money(submittedQuote.total_amount) }}</b></div>
           <div v-if="submittedQuote.notes">Notes: {{ submittedQuote.notes }}</div>
@@ -410,10 +422,13 @@ const advance = () => act(() => post('/advance'))
         <label for="q-scope">Scope of work: what is delivered and what is excluded</label>
         <textarea id="q-scope" v-model="quoteForm.scope_of_work" data-test="scope-of-work" />
         <h4>Estimate</h4>
-        <p class="small muted">Prices are selling prices, as charged to the client. Never enter purchase prices, suppliers or margin. Material lines form the materials budget; all other lines make up the phase amounts. The {{ acceptedTerms.fee_percentage }}% platform fee is added as a separate line.</p>
+        <p class="small muted">Prices are selling prices, as charged to the client. Never enter purchase prices, suppliers or margin. Put materials in a material section: <b>materials bought from third parties</b> form the materials budget, paid from the escrow to verified suppliers; <b>materials you supply yourself</b> (own stock, own production, resold by you, or from a company connected to you) count in the final phase and are paid with the final payout. All other lines make up the phase amounts. The {{ acceptedTerms.fee_percentage }}% platform fee is added as a separate line.</p>
         <div v-for="(s, si) in quoteForm.sections" :key="s.key" class="card" :data-test="`section-${si}`">
           <div class="row">
             <input v-model="s.title" placeholder="Section title, for example Preparation" style="flex: 1" :data-test="`section-title-${si}`" />
+            <select :value="s.kind ?? 'general'" style="max-width: 300px" :data-test="`section-kind-${si}`" @change="setSectionKind(s, ($event.target as HTMLSelectElement).value)">
+              <option v-for="k in SECTION_KINDS" :key="k" :value="k">{{ SECTION_KIND_LABEL[k] }}</option>
+            </select>
             <button type="button" class="btn danger small" @click="removeSection(si)">Remove section</button>
           </div>
           <table class="small" style="margin-top: 0.5rem">
@@ -421,11 +436,11 @@ const advance = () => act(() => post('/advance'))
             <tbody>
               <tr v-for="(l, li) in linesOf(s.key)" :key="li" :data-test="`line-${si}-${li}`">
                 <td><input v-model="l.description" data-test="line-description" /><input v-model="l.note" placeholder="note (optional)" class="small" /></td>
-                <td><select v-model="l.kind" data-test="line-kind"><option v-for="k in LINE_KINDS" :key="k" :value="k">{{ k }}</option></select></td>
+                <td><select v-if="(s.kind ?? 'general') === 'general'" v-model="l.kind" data-test="line-kind"><option v-for="k in LINE_KINDS.filter((x) => x !== 'material')" :key="k" :value="k">{{ k }}</option></select><span v-else>material</span></td>
                 <td style="width: 70px"><input v-model="l.quantity" inputmode="decimal" data-test="line-quantity" /></td>
                 <td style="width: 80px"><input v-model="l.unit" data-test="line-unit" /></td>
                 <td style="width: 100px"><input v-model="l.unit_price" inputmode="decimal" data-test="line-price" /></td>
-                <td><select v-model.number="l.phase" data-test="line-phase"><option v-for="p in acceptedTerms.payment_phases" :key="p.sequence" :value="p.sequence">{{ p.sequence }}. {{ p.kind }}</option></select></td>
+                <td><select v-model.number="l.phase" :disabled="s.kind === 'own_supply'" data-test="line-phase"><option v-for="p in acceptedTerms.payment_phases" :key="p.sequence" :value="p.sequence">{{ p.sequence }}. {{ p.kind }}</option></select></td>
                 <td>{{ money(estimate.lines[quoteForm.lines.indexOf(l)]?.amount) }}</td>
                 <td><button type="button" class="btn danger small" @click="removeLine(l)">×</button></td>
               </tr>
@@ -437,7 +452,9 @@ const advance = () => act(() => post('/advance'))
 
         <div class="info small" style="margin-top: 0.75rem" data-test="estimate-summary">
           <div v-for="p in estimate.phase_amounts" :key="p.sequence">{{ phaseName(p.sequence) }}: {{ money(p.amount) }} · {{ p.percentage }}%</div>
-          <div>Materials budget: {{ money(estimate.materials_budget_amount) }} · {{ estimate.materials_percentage }}%</div>
+          <div>Materials budget (bought from third parties): {{ money(estimate.materials_budget_amount) }} · {{ estimate.materials_percentage }}%</div>
+          <div v-if="estimate.own_supply_amount">Materials you supply, in the final phase: {{ money(estimate.own_supply_amount) }}</div>
+          <div data-test="holdback-note">{{ estimate.holdback_applies ? `Holdback: ${acceptedTerms.holdback_percentage}% of the contract value, withheld from the final payout during the warranty` : 'Material-only delivery: no holdback and no warranty tranches' }}</div>
           <div>Platform fee: {{ money(estimate.fee_amount) }} · {{ estimate.fee_percentage }}%</div>
           <div>Total contract amount: <b data-test="estimate-total">{{ money(estimate.total_amount) }}</b></div>
         </div>
