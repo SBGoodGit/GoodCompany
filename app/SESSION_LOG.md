@@ -99,3 +99,15 @@ Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_Ronde2b.md` (D29). Decision Log v
 
 **Next:** Sander reviews; push/merge of `mvp1` only on his instruction.
 
+## Step A — 18 November 2026
+
+Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_StapA_Werkomgeving.md` on branch `step-a-shell`. Choices in `BUILD_NOTES.md` 109–116.
+
+- Sidebar with modules per role and "Coming later" entries; top bar with search placeholder, SIMULATED pill, notifications counter and avatar menu; page heading with subtitle on every page.
+- Showcase design tokens in `assets/main.css`, existing classes restyled; building blocks in `components/ui/` for steps B–D.
+- Phone width: off-canvas sidebar, no horizontal scroll at 375 px.
+
+**Tests:** 95 Vitest + 16 Playwright, all passing. `npm run build` succeeds. Screenshots in `docs/screenshots/step-a/`.
+
+**Next:** Sander reviews the screenshots (or a preview version after "push"); merge to `main` deploys to production.
+

@@ -12,7 +12,7 @@ const l = computed(() => d.value?.loan)
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">Loan: {{ l.purpose_category }}</h1><span class="tag" data-test="loan-status">{{ l.status.replace('_', ' ') }}</span><span class="simulated">SIMULATED</span></div>
+    <div class="row"><h2 class="section-title">Loan: {{ l.purpose_category }}</h2><span class="tag" data-test="loan-status">{{ l.status.replace('_', ' ') }}</span><span class="simulated">SIMULATED</span></div>
     <div v-if="error" class="error" data-test="error">{{ error }}</div>
     <div v-if="notice" class="info" data-test="notice">{{ notice }}</div>
     <div class="card small">

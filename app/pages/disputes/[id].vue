@@ -26,7 +26,7 @@ const needsMe = (a: any) => a.required_signers.includes(d.value.me) && !a.signed
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">Case: {{ k.title }}</h1><span class="tag orange" data-test="dispute-status">{{ x.status.replaceAll('_', ' ') }}</span></div>
+    <div class="row"><h2 class="section-title">Case: {{ k.title }}</h2><span class="tag orange" data-test="dispute-status">{{ x.status.replaceAll('_', ' ') }}</span></div>
     <p class="small muted"><NuxtLink :to="`/contracts/${k.id}`">Back to the contract</NuxtLink> · Mediator: {{ d.names[k.mediator_id] }}</p>
     <div v-if="error" class="error" data-test="error">{{ error }}</div>
     <div v-if="notice" class="info" data-test="notice">{{ notice }}</div>

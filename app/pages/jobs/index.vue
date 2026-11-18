@@ -22,7 +22,7 @@ const catName = (k: string) => categories.value.find((c) => c.key === k)?.name ?
 <template>
   <div>
     <div v-if="isClient">
-      <div class="row"><h1>My jobs</h1><span class="spacer" /><NuxtLink class="btn accent" to="/jobs/new" data-test="post-job">Post a job</NuxtLink></div>
+      <div class="row"><h2 class="section-title">My jobs</h2><span class="spacer" /><NuxtLink class="btn accent" to="/jobs/new" data-test="post-job">Post a job</NuxtLink></div>
       <div class="card">
         <p v-if="!mine.length" class="muted">You have not posted a job yet.</p>
         <table v-else>
@@ -40,7 +40,7 @@ const catName = (k: string) => categories.value.find((c) => c.key === k)?.name ?
     </div>
 
     <div v-if="isContractor">
-      <h1>Find jobs</h1>
+      <h2 class="section-title">Find jobs</h2>
       <form class="card" @submit.prevent="search">
         <div class="grid2">
           <div><label for="q">Search</label><input id="q" v-model="filters.q" placeholder="Title or description" /></div>

@@ -5,7 +5,7 @@ onMounted(async () => { list.value = await api('/api/contracts') })
 </script>
 <template>
   <div>
-    <h1>My Contracts</h1>
+    <h2 class="section-title">My contracts</h2>
     <div class="card">
       <p v-if="!list.length" class="muted">No contracts yet.</p>
       <table v-else>

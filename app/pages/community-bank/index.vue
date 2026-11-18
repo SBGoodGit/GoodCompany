@@ -10,7 +10,7 @@ onMounted(async () => {
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">Community Bank</h1><span class="simulated">SIMULATED BALANCES — NO REAL MONEY</span><span class="spacer" />
+    <div class="row"><span class="simulated">SIMULATED BALANCES — NO REAL MONEY</span><span class="spacer" />
       <NuxtLink class="btn accent" to="/community-bank/apply" data-test="apply-loan">Apply for a loan</NuxtLink></div>
     <div class="grid2">
       <div class="card small">

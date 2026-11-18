@@ -6,7 +6,7 @@ onMounted(async () => { cases.value = await api('/api/mediator/cases') })
 </script>
 <template>
   <div>
-    <h1>My cases</h1>
+    
     <p class="small muted">You mediate and may give non-binding advice. You have no signing role: you cannot force or release a payment.</p>
     <div class="card">
       <p v-if="!cases.length" class="muted">No active cases.</p>

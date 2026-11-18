@@ -195,7 +195,7 @@ const advance = () => act(() => post('/advance'))
 <template>
   <div v-if="d">
     <div class="row">
-      <h1 style="margin: 0">{{ d.job.title }}</h1>
+      <h2 class="section-title">{{ d.job.title }}</h2>
       <span class="tag" :class="{ grey: !open }">{{ open ? label(ws.stage) : ws.outcome.replaceAll('_', ' ') }}</span>
       <span class="spacer" />
       <button v-if="open" class="btn danger small" data-test="withdraw" @click="withdraw">{{ isClient ? 'Close this candidate' : 'Withdraw' }}</button>
@@ -212,9 +212,7 @@ const advance = () => act(() => post('/advance'))
       <NuxtLink :to="`/jobs/${d.job.id}`">Overview</NuxtLink>
     </div>
     <div v-if="ws.parent_contract_id" class="info small">Extra work as a linked contract with its own escrow. <NuxtLink :to="`/contracts/${ws.parent_contract_id}`">Open the first contract</NuxtLink></div>
-    <div class="stepper">
-      <div v-for="(s, i) in STAGES" :key="s" class="step" :class="{ done: i < stageIndex, current: i === stageIndex }">{{ label(s) }}</div>
-    </div>
+    <UiStageStepper :stages="STAGES.map(label)" :current="stageIndex" />
     <div v-if="ws.outcome === 'closed_other_selected'" class="notice">This job was awarded to another contractor. The workspace is closed.</div>
     <div v-if="d.contract" class="info">Contract signed. <NuxtLink :to="`/contracts/${d.contract.id}`">Open the contract</NuxtLink></div>
     <div v-if="error" class="error" data-test="error">{{ error }}</div>

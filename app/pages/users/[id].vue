@@ -7,7 +7,7 @@ onMounted(async () => { p.value = await api(`/api/profiles/${route.params.id}`) 
 </script>
 <template>
   <div v-if="p" class="card">
-    <div class="row"><h1 style="margin: 0">{{ p.display_name }}</h1><span v-for="b in p.badges" :key="b" class="tag">{{ b }}</span><span class="tag grey">{{ p.account_type }}</span></div>
+    <div class="row"><h2 class="section-title">{{ p.display_name }}</h2><span v-for="b in p.badges" :key="b" class="tag">{{ b }}</span><span class="tag grey">{{ p.account_type }}</span></div>
     <p>{{ p.description }}</p>
     <p class="small muted">{{ p.region }} · {{ p.role }}</p>
     <div class="small">Expertise: <span v-for="t in p.expertise_tags" :key="t" class="tag" style="margin-right: 0.25rem">{{ t }}</span></div>

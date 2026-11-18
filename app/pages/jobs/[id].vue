@@ -25,7 +25,7 @@ async function setStatus(status: string) {
   <div v-if="data">
     <div class="card">
       <div class="row">
-        <h1 style="margin: 0">{{ data.job.title }}</h1>
+        <h2 class="section-title">{{ data.job.title }}</h2>
         <span class="tag">{{ data.job.category }}</span>
         <span class="tag grey">{{ data.job.selected_contractor_id ? 'awarded' : data.job.status }}</span>
       </div>

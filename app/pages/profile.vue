@@ -24,7 +24,7 @@ const selfRoles = computed(() => ['client', 'contractor', 'both'].includes(d.val
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">My profile</h1><span class="spacer" /><NuxtLink :to="`/users/${d.user.id}`">View public profile</NuxtLink></div>
+    <div class="row"><h2 class="section-title">My profile</h2><span class="spacer" /><NuxtLink :to="`/users/${d.user.id}`">View public profile</NuxtLink></div>
     <form class="card" @submit.prevent="save">
       <div class="grid2">
         <div><label for="p-name">Display name</label><input id="p-name" v-model="form.display_name" /></div>

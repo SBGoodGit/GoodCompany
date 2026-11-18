@@ -100,7 +100,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 <template>
   <div v-if="d && e">
     <div class="row">
-      <h1 style="margin: 0">{{ s.job.title }}</h1>
+      <h2 class="section-title">{{ s.job.title }}</h2>
       <span class="tag" data-test="contract-status">{{ status.replace('_', ' ') }}</span>
       <span class="spacer" />
       <span class="small">Your balance: <b data-test="my-balance">{{ money(e.my_simulated_balance) }}</b> <span class="simulated">SIMULATED</span></span>

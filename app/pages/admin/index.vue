@@ -52,7 +52,7 @@ const runJob = (job: string) => run(async () => {
 
 <template>
   <div>
-    <h1>Admin</h1>
+    
     <div v-if="error" class="error" data-test="error">{{ error }}</div><div v-if="msg" class="info" data-test="notice">{{ msg }}</div>
 
     <div class="card">
