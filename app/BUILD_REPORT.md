@@ -89,3 +89,8 @@ npm run dev                         # http://127.0.0.1:3100
 - Demo accounts: `client@`, `contractor@`, `supplier@`, `mediator@goodcompany.test` (password `SEED_USER_PASSWORD`), admin `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` — all from `.env`, never committed.
 - Tests: `npm test` (needs the local database) and `npx playwright install chromium` once, then `npm run test:e2e` (starts or reuses the dev server).
 - System jobs run automatically in the dev server; the admin page can run them on demand.
+
+## 6. Online (Cloudflare Workers + Supabase)
+
+Plan and progress: `../../GoodCompany_Hosting_Plan_MVP1.md` (outside the repository). `npm run build` now produces the Cloudflare Worker `goodcompany-mvp1`; `npm run dev` and the tests still run on Node. The Worker is deployed by Cloudflare Workers Builds on a push to `main` (root directory `app/`), never by hand. It needs the Hyperdrive binding (connection as `gc_app`) and the runtime variables `NUXT_SUPABASE_SERVICE_ROLE_KEY`, `NUXT_PUBLIC_SUPABASE_URL`, `NUXT_PUBLIC_SUPABASE_ANON_KEY`. Choices in `BUILD_NOTES.md` 103–108.
+
