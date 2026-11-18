@@ -111,3 +111,5 @@ Built to `GoodCompany_ClaudeCode_Opdracht_MVP1_StapA_Werkomgeving.md` on branch 
 
 **Next:** Sander reviews the screenshots (or a preview version after "push"); merge to `main` deploys to production.
 
+**Step A, addition:** "How it works" button in every page heading and ⓘ icons at 11 functions, one popup, texts in `shared/help.ts` (BUILD_NOTES 117). Tests: 98 Vitest + 16 Playwright, all passing; build succeeds.
+

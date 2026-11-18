@@ -47,7 +47,7 @@ async function setStatus(status: string) {
     <div v-if="error" class="error">{{ error }}</div>
 
     <div v-if="data.is_owner" class="card" data-test="conversations">
-      <h3>Conversations</h3>
+      <h3>Conversations <HelpInfo topic="candidates" /></h3>
       <p v-if="data.candidates" class="small muted">
         Introductions are unlimited. Past the introduction: {{ data.candidates.active }} of {{ data.candidates.limit }} candidates
         (technical intake, terms or quote) · swaps used {{ data.candidates.swaps_used }} of {{ data.candidates.swaps_max }}.

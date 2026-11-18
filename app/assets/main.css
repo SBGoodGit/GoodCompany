@@ -148,7 +148,14 @@ tbody tr:last-child td { border-bottom: none; }
 .avatar-menu a, .avatar-menu button { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; border: 0; background: none; color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 600; cursor: pointer; }
 .avatar-menu a:hover, .avatar-menu button:hover { background: var(--teal-tint); }
 .menu-btn { display: none; }
-.page-heading { padding: 20px 28px 4px; }
+.page-heading { padding: 20px 28px 4px; display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
+.help-btn { flex-shrink: 0; margin-top: 2px; }
+.help-modal { width: min(560px, 94vw); max-height: 86vh; overflow-y: auto; }
+.help-what { font-size: 13.5px; margin: 10px 0 4px; }
+.help-list { padding-left: 20px; margin: 0 0 8px; font-size: 13px; }
+.help-list li { margin-bottom: 5px; }
+.info-icon { border: 0; background: none; color: var(--teal-dark); font-size: 14px; cursor: pointer; padding: 0 4px; vertical-align: middle; line-height: 1; }
+.info-icon:hover { color: var(--orange); }
 .page-heading h1 { margin: 0; }
 .page-heading .sub { font-size: 12.5px; color: var(--slate); margin-top: 2px; }
 .scrim { display: none; }

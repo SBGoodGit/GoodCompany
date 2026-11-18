@@ -33,6 +33,22 @@ test('sidebar per role, Coming later disabled, unread counter, avatar menu', asy
     await expect(c.getByTestId('nav-community-bank')).toHaveClass(/active/)
     await expect(c.getByTestId('page-heading')).toContainText('Reserves, loans and voting')
 
+    // "How it works": a button in the page heading opens the page text; Esc and ✕ close it
+    await c.getByTestId('how-it-works').click()
+    await expect(c.getByTestId('help-dialog')).toContainText('How it works: Community Bank')
+    await expect(c.getByTestId('help-dialog')).toContainText('60/20/10/10')
+    await expect(c.getByTestId('help-dialog')).toContainText('Based on:')
+    await c.keyboard.press('Escape')
+    await expect(c.getByTestId('help-dialog')).toHaveCount(0)
+    // ⓘ next to a function opens that topic
+    await c.getByTestId('info-fee').click()
+    await expect(c.getByTestId('help-dialog')).toContainText('How it works: Platform fee')
+    await c.getByTestId('help-close').click()
+    await expect(c.getByTestId('help-dialog')).toHaveCount(0)
+    await c.goto('/jobs')
+    await c.getByTestId('how-it-works').click()
+    await expect(c.getByTestId('help-dialog')).toContainText('never shown to contractors')
+
     // Unread counter in the top bar
     await expect(c.getByTestId('unread-count')).toHaveCount(0)
     await sql`insert into notifications (user_id, type, title) values (${client.id}, 'test', 'Shell test notice'), (${client.id}, 'test', 'Second notice')`

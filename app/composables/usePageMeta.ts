@@ -1,6 +1,6 @@
 // Page title and one-line subtitle shown by the shell (step A), as in the showcase's page heading.
 // Keyed by the route name Nuxt derives from the file under pages/.
-const META: Record<string, [string, string]> = {
+export const PAGE_META: Record<string, [string, string]> = {
   dashboard: ['Dashboard', 'Overview of all your GoodCompany activity'],
   jobs: ['Marketplace', 'Search, post and manage jobs'],
   'jobs-new': ['Post a job', 'Describe the work; your indicative budget stays private'],
@@ -26,7 +26,7 @@ const META: Record<string, [string, string]> = {
 export function usePageMeta() {
   const route = useRoute()
   return computed(() => {
-    const [title, sub] = META[String(route.name)] ?? ['GoodCompany', '']
+    const [title, sub] = PAGE_META[String(route.name)] ?? ['GoodCompany', '']
     return { title, sub }
   })
 }
