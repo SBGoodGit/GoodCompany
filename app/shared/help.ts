@@ -54,8 +54,8 @@ export const PAGE_HELP: Record<string, HelpEntry> = {
   },
   workspaces: {
     title: 'Negotiation workspaces',
-    what: 'All your negotiations, as client or contractor, with the stage each one is in.',
-    steps: ['Open a workspace to continue where you left off.'],
+    what: 'All your negotiations, with the stage each one is in: as a contractor, the jobs you responded to; as a client, the contractors who responded to your jobs.',
+    steps: ['Open a workspace to continue where you left off.', 'Once both sign, the negotiation becomes a contract and continues under Contracts.'],
     know: ['A workspace without activity for 21 days expires; you get a notice 3 days before.'],
     basis: 'Build Spec §7.9, §9.1',
   },
@@ -78,7 +78,7 @@ export const PAGE_HELP: Record<string, HelpEntry> = {
   },
   contracts: {
     title: 'Contracts',
-    what: 'Your signed contracts and the state of their escrow.',
+    what: 'Your signed contracts and the state of their escrow: the work you were chosen for, or the contractors you chose.',
     steps: ['Open a contract to fund it, follow the milestones and handle requests.'],
     basis: 'Build Spec §3.5',
   },
@@ -119,11 +119,11 @@ export const PAGE_HELP: Record<string, HelpEntry> = {
     what: 'The cooperative fund that the platform fees build up, and that lends to members.',
     steps: [
       'Each contract pays a 2% platform fee. Fees are collected in batches.',
-      'A batch goes 1% to the organisation reserve; the rest is split 60/20/10/10 over the Safety, Credit, Legal and Innovation reserves.',
+      'Of each batch, 1% (that is 0.02% of the contract values) goes to the GoodCompany organisation reserve for running and infrastructure costs, not as profit. The other 99% is split 60/20/10/10 over the Safety, Credit, Legal and Innovation reserves.',
       'Members apply for a loan for equipment, inventory, transport or software.',
     ],
     know: ['Fee batches show time and amount only, so no single contract can be traced.', 'All balances are simulated.'],
-    basis: 'Build Spec §3.6, §7.1; D10',
+    basis: 'Build Spec §3.6, §7.1, Appendix A; D10',
   },
   'community-bank-apply': {
     title: 'Loan application',
