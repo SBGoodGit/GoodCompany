@@ -14,9 +14,9 @@
     "crons": ["*/5 * * * *"]
   },
   // Database through Hyperdrive, logging in as the restricted role gc_app.
-  // The id is filled in once the Hyperdrive configuration exists in the Cloudflare dashboard.
+  // Hyperdrive configuration goodcompany-mvp1-db (caching off) → Supabase project GoodCompany.
   "hyperdrive": [
-    { "binding": "HYPERDRIVE", "id": "REPLACE_WITH_HYPERDRIVE_ID" }
+    { "binding": "HYPERDRIVE", "id": "0def1e56265f458194823a32f85b5198" }
   ],
   "observability": {
     "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true, "persist": true }
