@@ -195,7 +195,7 @@ const advance = () => act(() => post('/advance'))
 <template>
   <div v-if="d">
     <div class="row">
-      <h1 style="margin: 0">{{ d.job.title }}</h1>
+      <h2 class="section-title">{{ d.job.title }}</h2>
       <span class="tag" :class="{ grey: !open }">{{ open ? label(ws.stage) : ws.outcome.replaceAll('_', ' ') }}</span>
       <span class="spacer" />
       <button v-if="open" class="btn danger small" data-test="withdraw" @click="withdraw">{{ isClient ? 'Close this candidate' : 'Withdraw' }}</button>
@@ -212,9 +212,7 @@ const advance = () => act(() => post('/advance'))
       <NuxtLink :to="`/jobs/${d.job.id}`">Overview</NuxtLink>
     </div>
     <div v-if="ws.parent_contract_id" class="info small">Extra work as a linked contract with its own escrow. <NuxtLink :to="`/contracts/${ws.parent_contract_id}`">Open the first contract</NuxtLink></div>
-    <div class="stepper">
-      <div v-for="(s, i) in STAGES" :key="s" class="step" :class="{ done: i < stageIndex, current: i === stageIndex }">{{ label(s) }}</div>
-    </div>
+    <UiStageStepper :stages="STAGES.map(label)" :current="stageIndex" />
     <div v-if="ws.outcome === 'closed_other_selected'" class="notice">This job was awarded to another contractor. The workspace is closed.</div>
     <div v-if="d.contract" class="info">Contract signed. <NuxtLink :to="`/contracts/${d.contract.id}`">Open the contract</NuxtLink></div>
     <div v-if="error" class="error" data-test="error">{{ error }}</div>
@@ -241,7 +239,7 @@ const advance = () => act(() => post('/advance'))
       </form>
       <div v-if="ws.stage === 'introduction'" style="margin-top: 0.75rem">
         <template v-if="isClient">
-          <p v-if="slots" class="small muted">Candidates past the introduction: {{ slots.active }} of {{ slots.limit }} · swaps used {{ slots.swaps_used }} of {{ slots.swaps_max }}.</p>
+          <p v-if="slots" class="small muted"><HelpInfo topic="candidates" /> Candidates past the introduction: {{ slots.active }} of {{ slots.limit }} · swaps used {{ slots.swaps_used }} of {{ slots.swaps_max }}.</p>
           <button class="btn" data-test="advance" @click="advance">Move this candidate to the technical intake</button>
         </template>
         <p v-else class="small muted">The client decides whether to move you into the technical intake. Introduce yourself and answer the client's questions in the meantime.</p>
@@ -276,7 +274,7 @@ const advance = () => act(() => post('/advance'))
       <h3>Technical intake</h3>
       <p class="small muted">Both parties can ask questions. Each of you answers the questions addressed to you.</p>
       <div class="info small" data-test="budget">
-        <b>Budget for this project</b> <span class="tag orange">required</span> — asked of the client, visible only in this conversation.
+        <b>Budget for this project</b> <HelpInfo topic="budget" /> <span class="tag orange">required</span> — asked of the client, visible only in this conversation.
         <div v-if="isClient && ws.stage === 'technical_intake'" class="grid2" style="margin-top: 0.5rem">
           <div><label for="b-min">Minimum ({{ d.rules.currency }})</label><input id="b-min" v-model="budget.min" inputmode="decimal" data-test="budget-min" /></div>
           <div><label for="b-max">Maximum ({{ d.rules.currency }})</label><input id="b-max" v-model="budget.max" inputmode="decimal" data-test="budget-max" /></div>
@@ -341,7 +339,7 @@ const advance = () => act(() => post('/advance'))
           <div class="grid2">
             <div><label for="t-warranty">Warranty period</label>
               <select id="t-warranty" v-model.number="termsForm.warranty_period_days"><option v-for="o in d.rules.warranty_options" :key="o" :value="o">{{ o }} days</option></select></div>
-            <div><label>Holdback</label><input :value="`${d.rules.holdback_percentage}% (fixed)`" disabled /></div>
+            <div><label>Holdback <HelpInfo topic="holdback" /></label><input :value="`${d.rules.holdback_percentage}% (fixed)`" disabled /></div>
             <div><label for="t-exec">Execution period (days)</label><input id="t-exec" v-model.number="termsForm.execution_period_days" type="number" min="1" /></div>
             <div><label for="t-hours">Working hours</label><input id="t-hours" v-model="termsForm.working_hours" /></div>
             <div><label for="t-comm">Communication channel</label><input id="t-comm" v-model="termsForm.communication_channel" /></div>
@@ -389,7 +387,7 @@ const advance = () => act(() => post('/advance'))
         <h4>Scope of work</h4>
         <p style="white-space: pre-line">{{ submittedQuote.scope_of_work }}</p>
         <template v-if="submittedQuote.estimate">
-          <h4>Estimate</h4>
+          <h4>Estimate <HelpInfo topic="estimate" /></h4>
           <table v-if="submittedQuote.estimate.detail_level === 'lines'" data-test="estimate-lines">
             <thead><tr><th>Section</th><th>Description</th><th>Kind</th><th>Quantity</th><th>Unit price</th><th>Amount</th><th>Phase</th></tr></thead>
             <tbody><tr v-for="(l, i) in submittedQuote.estimate.lines" :key="i">
@@ -421,7 +419,7 @@ const advance = () => act(() => post('/advance'))
       <form v-if="isContractor && ws.stage === 'quote' && estimate" style="margin-top: 0.75rem" data-test="quote-builder" @submit.prevent="submitQuote">
         <label for="q-scope">Scope of work: what is delivered and what is excluded</label>
         <textarea id="q-scope" v-model="quoteForm.scope_of_work" data-test="scope-of-work" />
-        <h4>Estimate</h4>
+        <h4>Estimate <HelpInfo topic="estimate" /></h4>
         <p class="small muted">Prices are selling prices, as charged to the client. Never enter purchase prices, suppliers or margin. Put materials in a material section: <b>materials bought from third parties</b> form the materials budget, paid from the escrow to verified suppliers; <b>materials you supply yourself</b> (own stock, own production, resold by you, or from a company connected to you) count in the final phase and are paid with the final payout. All other lines make up the phase amounts. The {{ acceptedTerms.fee_percentage }}% platform fee is added as a separate line.</p>
         <div v-for="(s, si) in quoteForm.sections" :key="s.key" class="card" :data-test="`section-${si}`">
           <div class="row">
@@ -471,7 +469,7 @@ const advance = () => act(() => post('/advance'))
 
     <!-- Contract preview and signing -->
     <div v-if="d.preview" class="card" data-test="contract-preview">
-      <h3>Contract preview</h3>
+      <h3>Contract preview <HelpInfo topic="signing" /></h3>
       <div class="grid2 small">
         <div>
           <div>Contract amount: <b>{{ money(d.preview.snapshot.quote.total_amount) }}</b> ({{ d.preview.snapshot.quote.currency }})</div>

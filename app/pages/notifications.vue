@@ -9,7 +9,7 @@ async function readAll() { await api('/api/notifications/all/read', { method: 'P
 </script>
 <template>
   <div>
-    <div class="row"><h1 style="margin: 0">Notifications</h1><span class="spacer" /><button v-if="list.some((n) => !n.read_at)" class="btn secondary small" @click="readAll">Mark all read</button></div>
+    <div class="row"><span class="spacer" /><button v-if="list.some((n) => !n.read_at)" class="btn secondary small" @click="readAll">Mark all read</button></div>
     <div class="card">
       <p v-if="!list.length" class="muted">No notifications.</p>
       <div v-for="n in list" :key="n.id" class="row small" style="border-bottom: 1px solid var(--line); padding: 0.4rem 0; cursor: pointer" @click="open(n)">

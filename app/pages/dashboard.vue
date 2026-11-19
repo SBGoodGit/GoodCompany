@@ -8,7 +8,7 @@ const label = (s: string) => s.replaceAll('_', ' ')
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">Welcome, {{ me?.profile.display_name }}</h1><span class="spacer" />
+    <div class="row"><h2 class="section-title">Welcome, {{ me?.profile.display_name }}</h2><span class="spacer" />
       <span class="small">Your balance: <b>{{ fmtMoney(d.my_simulated_balance) }}</b> <span class="simulated">SIMULATED</span></span></div>
     <div v-if="d.deadlines.length" class="card" data-test="deadlines">
       <h3>Deadlines</h3>

@@ -19,7 +19,7 @@ const open = computed(() => x.value && ['mediator_active', 'advice_issued'].incl
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">{{ d.contract.title }}</h1><span class="tag orange">{{ x.status.replaceAll('_', ' ') }}</span></div>
+    <div class="row"><h2 class="section-title">{{ d.contract.title }}</h2><span class="tag orange">{{ x.status.replaceAll('_', ' ') }}</span></div>
     <p class="small muted"><NuxtLink to="/mediator">All cases</NuxtLink> · Client: {{ d.names[d.contract.client_id] }} · Contractor: {{ d.names[d.contract.contractor_id] }}</p>
     <div v-if="error" class="error" data-test="error">{{ error }}</div>
     <div v-if="notice" class="info" data-test="notice">{{ notice }}</div>

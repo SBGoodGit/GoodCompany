@@ -39,7 +39,7 @@ Stack: Nuxt 3 + TypeScript (SPA, server API), Supabase run locally (Postgres, em
 
 ## 3. Choices made where the spec was open
 
-All 102 choices, with location and reasoning, are in `BUILD_NOTES.md`. The ones that most affect behaviour:
+All 117 choices, with location and reasoning, are in `BUILD_NOTES.md`. The ones that most affect behaviour:
 
 - **Architecture** (1–8): SPA + server API; RLS deny-all for the public roles with all authorisation in the server; restricted `gc_app` role; local Supabase on ports 553xx.
 - **Identity and signatures** (9–13): verified email only; step-up = password re-entry giving a single-use 5-minute grant; every signature is an attestation tied to that grant.
@@ -58,8 +58,8 @@ All 102 choices, with location and reasoning, are in `BUILD_NOTES.md`. The ones 
 
 Run on 17 November 2026 against the local stack:
 
-- **Vitest: 95 tests, 8 files — all pass** (after round 2b). Round 2b added: own-supply materials in the final phase and refused earlier, material-only delivery with no holdback and the correct payout, a mixed contract emptying the escrow to the cent, order status per line. Including the itemised estimate (line amounts, phase amounts from lines, fee line, materials budget, final phase ≥ 10%, exact totals, detail levels) and **the §7.1 example built through an itemised estimate**. Money and rounding; terms validation; budget hiding; canonical hashing; database guarantees (append-only, RLS); **32 ledger tests covering every action and its conditions, including the §7.1 worked example as an exact assertion (contract 10,000.00 → contractor 7,200.00, suppliers 2,600.00, fee 200.00, escrow empty)**; reviews, reputation, warranty metrics, interest, vote tiers, fee batch split, Safety Reserve threshold, health score.
-- **Playwright: 14 tests, 6 files — all pass** (after round 2b). New: a material-only delivery from estimate through signing, funding, a supplier payment linked to a line, completion request and approval. The negotiation test now runs the round 2 flow: introductions → three candidates into the intake (a fourth refused) → one swap → pause new applicants → two-way intake with the budget → terms revision, then acceptance with the warning → itemised estimate → signing → a completion request showing its phase's lines.
+- **Vitest: 98 tests, 9 files — all pass** (after step A). Round 2b added: own-supply materials in the final phase and refused earlier, material-only delivery with no holdback and the correct payout, a mixed contract emptying the escrow to the cent, order status per line. Including the itemised estimate (line amounts, phase amounts from lines, fee line, materials budget, final phase ≥ 10%, exact totals, detail levels) and **the §7.1 example built through an itemised estimate**. Money and rounding; terms validation; budget hiding; canonical hashing; database guarantees (append-only, RLS); **32 ledger tests covering every action and its conditions, including the §7.1 worked example as an exact assertion (contract 10,000.00 → contractor 7,200.00, suppliers 2,600.00, fee 200.00, escrow empty)**; reviews, reputation, warranty metrics, interest, vote tiers, fee batch split, Safety Reserve threshold, health score.
+- **Playwright: 16 tests, 7 files — all pass** (after step A; new: the work environment per role and at phone width). New: a material-only delivery from estimate through signing, funding, a supplier payment linked to a line, completion request and approval. The negotiation test now runs the round 2 flow: introductions → three candidates into the intake (a fourth refused) → one swap → pause new applicants → two-way intake with the budget → terms revision, then acceptance with the warning → itemised estimate → signing → a completion request showing its phase's lines.
   - Sign-up requires a verified email.
   - Job → workspace (five stages) → both sign → contract awaiting funding, rival candidate closed out.
   - **Path 1 through the UI: job → workspace → signing → funding → advance and supplier payments → completion → approval → holdback tranches, with the §7.1 numbers.**
@@ -93,4 +93,8 @@ npm run dev                         # http://127.0.0.1:3100
 ## 6. Online (Cloudflare Workers + Supabase)
 
 Plan and progress: `../../GoodCompany_Hosting_Plan_MVP1.md` (outside the repository). `npm run build` now produces the Cloudflare Worker `goodcompany-mvp1`; `npm run dev` and the tests still run on Node. The Worker is deployed by Cloudflare Workers Builds on a push to `main` (root directory `app/`), never by hand. It needs the Hyperdrive binding (connection as `gc_app`) and the runtime variables `NUXT_SUPABASE_SERVICE_ROLE_KEY`, `NUXT_PUBLIC_SUPABASE_URL`, `NUXT_PUBLIC_SUPABASE_ANON_KEY`. Choices in `BUILD_NOTES.md` 103–108.
+
+## 7. Step A — work environment of the showcase
+
+Every signed-in page now sits in the showcase's work environment: a sidebar with the modules (and greyed "Coming later" modules), a top bar with the SIMULATED label, notifications and an avatar menu, and a page heading with a subtitle; the showcase design tokens throughout. Logic, API and data are unchanged. Every page has a "How it works" button and key functions an ⓘ icon; all texts are in `shared/help.ts`. Choices in `BUILD_NOTES.md` 109–117; screenshots in `docs/screenshots/step-a/`.
 

@@ -100,7 +100,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 <template>
   <div v-if="d && e">
     <div class="row">
-      <h1 style="margin: 0">{{ s.job.title }}</h1>
+      <h2 class="section-title">{{ s.job.title }}</h2>
       <span class="tag" data-test="contract-status">{{ status.replace('_', ' ') }}</span>
       <span class="spacer" />
       <span class="small">Your balance: <b data-test="my-balance">{{ money(e.my_simulated_balance) }}</b> <span class="simulated">SIMULATED</span></span>
@@ -114,7 +114,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 
     <!-- Funding -->
     <div v-if="status === 'awaiting_funding'" class="card">
-      <h3>Funding</h3>
+      <h3>Funding <HelpInfo topic="fee" /></h3>
       <p class="small">Execution may not start until the client has funded the escrow. The client deposits the full contract amount, <b>{{ money(s.quote.total_amount) }}</b>; nothing is added on top.</p>
       <button v-if="isClient" class="btn accent" data-test="fund" @click="doAction('fund', {}, 'Escrow funded: the contract is active')">Fund the escrow</button>
       <p v-else class="small muted">Waiting for the client to fund the escrow.</p>
@@ -122,7 +122,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 
     <!-- Escrow overview -->
     <div v-if="esc" class="card" data-test="escrow">
-      <div class="row"><h3 style="margin: 0">Escrow</h3><span class="simulated">SIMULATED BALANCES — NO REAL MONEY</span></div>
+      <div class="row"><h3 style="margin: 0">Escrow <HelpInfo topic="escrow" /></h3><span class="simulated">SIMULATED BALANCES — NO REAL MONEY</span></div>
       <div class="grid2 small" style="margin-top: 0.5rem">
         <div>
           <div v-if="isContractor">Balance in escrow: <b data-test="escrow-balance">{{ money(esc.balance) }}</b></div>
@@ -165,7 +165,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 
     <!-- Milestones and completion -->
     <div class="card">
-      <h3>Milestones</h3>
+      <h3>Milestones <HelpInfo topic="holdback" /></h3>
       <table class="small">
         <thead><tr><th>#</th><th>Kind</th><th>Description</th><th>Amount</th><th>Status</th><th /></tr></thead>
         <tbody>
@@ -245,7 +245,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 
     <!-- Disputes -->
     <div v-if="e.disputes.length" class="card">
-      <h3>Disputes</h3>
+      <h3>Disputes <HelpInfo topic="dispute" /></h3>
       <div v-for="x in e.disputes" :key="x.id" class="row small">
         <NuxtLink :to="`/disputes/${x.id}`" data-test="dispute-link">Case: {{ x.trigger.replace('_', ' ') }}</NuxtLink>
         <span>{{ money(x.disputed_amount) }}</span>
@@ -254,7 +254,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
       </div>
     </div>
     <div v-if="isClient && status === 'completed'" class="card small">
-      <h3>Warranty objection</h3>
+      <h3>Warranty objection <HelpInfo topic="holdback" /></h3>
       <p class="muted">Freezes unclaimed holdback tranches up to the amount you state. Tranches already claimed are final.</p>
       <div class="grid2"><div><label>Amount</label><input v-model="warrantyObjection.amount" inputmode="decimal" /></div><div><label>Reason</label><input v-model="warrantyObjection.reason" /></div></div>
       <button class="btn danger small" style="margin-top: 0.5rem" @click="doAction('object', { disputed_amount: warrantyObjection.amount, reason: warrantyObjection.reason }, 'Warranty objection recorded')">Object</button>
@@ -262,7 +262,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 
     <!-- Materials: order status per third-party line (D29); supplier payments for the contractor only -->
     <div v-if="e.material_lines.length || (isContractor && status === 'active')" class="card small" data-test="materials">
-      <h3>Materials bought from third parties</h3>
+      <h3>Materials bought from third parties <HelpInfo topic="materials" /></h3>
       <p class="muted">Order status per line. {{ isClient ? 'You see the status only, never what was paid or where it was bought.' : 'Information only: no approval, window or trigger. A supplier payment sets its lines to ordered; set delivered yourself.' }}</p>
       <table v-if="e.material_lines.length">
         <tbody><tr v-for="l in e.material_lines" :key="l.id" :data-test="`material-line-${l.position}`">
@@ -294,7 +294,7 @@ const actionFor = (cid: string) => (e.value?.actions ?? []).find((a: any) => a.a
 
     <!-- Change Orders -->
     <div v-if="esc" class="card small">
-      <h3>Change Orders</h3>
+      <h3>Change Orders <HelpInfo topic="change-orders" /></h3>
       <div v-for="c in e.change_orders" :key="c.id" class="card" style="margin-bottom: 0.5rem">
         <div class="row"><b>{{ c.description }}</b><span class="tag" :class="{ orange: c.status === 'proposed' }">{{ c.status }}</span><span class="spacer" /><span>{{ c.amount_delta > 0 ? '+' : '' }}{{ money(c.amount_delta) }}</span></div>
         <div class="muted">Motivation: {{ c.motivation }} · proposed by {{ name(c.requested_by) }} · expires {{ c.expires_at.slice(0, 10) }}</div>

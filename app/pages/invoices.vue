@@ -9,7 +9,7 @@ watch(direction, load)
 </script>
 <template>
   <div>
-    <div class="row"><h1 style="margin: 0">Invoices</h1><span class="spacer" />
+    <div class="row"><span class="spacer" />
       <select v-model="direction" style="width: 180px"><option value="">All</option><option value="issued">Issued</option><option value="received">Received</option></select></div>
     <p class="small simulated">Generated from simulated payments. Tax and bookkeeping treatment is still under specialist review (O23).</p>
     <div class="card">

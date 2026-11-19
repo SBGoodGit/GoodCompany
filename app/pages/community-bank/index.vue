@@ -10,7 +10,7 @@ onMounted(async () => {
 </script>
 <template>
   <div v-if="d">
-    <div class="row"><h1 style="margin: 0">Community Bank</h1><span class="simulated">SIMULATED BALANCES — NO REAL MONEY</span><span class="spacer" />
+    <div class="row"><span class="simulated">SIMULATED BALANCES — NO REAL MONEY</span><span class="spacer" />
       <NuxtLink class="btn accent" to="/community-bank/apply" data-test="apply-loan">Apply for a loan</NuxtLink></div>
     <div class="grid2">
       <div class="card small">
@@ -28,19 +28,19 @@ onMounted(async () => {
       </div>
     </div>
     <div class="card small">
-      <h3>Fee batches</h3>
+      <h3>Fee batches <HelpInfo topic="fee" /></h3>
       <p class="muted">Time and amount only. Fees are batched so that no single contract can be traced.</p>
       <p v-if="!batches.length" class="muted">No batches yet.</p>
       <table v-else><tbody><tr v-for="(b, i) in batches" :key="i"><td>{{ new Date(b.executed_at).toLocaleString() }}</td><td>{{ b.fee_count }} fees</td><td>{{ fmtMoney(Number(b.total_amount)) }}</td></tr></tbody></table>
     </div>
     <div class="grid2">
       <div class="card small">
-        <h3>My loan applications</h3>
+        <h3>My loan applications <HelpInfo topic="loan-voting" /></h3>
         <p v-if="!loans.mine.length" class="muted">None.</p>
         <div v-for="l in loans.mine" :key="l.id"><NuxtLink :to="`/community-bank/loans/${l.id}`">{{ l.purpose_category }} · {{ fmtMoney(l.amount_requested) }}</NuxtLink> <span class="tag">{{ l.status.replace('_', ' ') }}</span></div>
       </div>
       <div class="card small">
-        <h3>Invitations to vote</h3>
+        <h3>Invitations to vote <HelpInfo topic="loan-voting" /></h3>
         <p v-if="!loans.invited.length" class="muted">You have no open invitations. Members are invited at random.</p>
         <div v-for="l in loans.invited" :key="l.id"><NuxtLink :to="`/community-bank/loans/${l.id}`">{{ l.purpose_category }} · {{ fmtMoney(l.amount_requested) }}</NuxtLink> <span class="tag orange">{{ l.invitation_status }}</span></div>
       </div>

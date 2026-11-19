@@ -20,7 +20,7 @@ const remove = (c: any) => { if (confirm(`Remove ${c.display_name}?`)) run(() =>
 </script>
 <template>
   <div>
-    <h1>Contacts</h1>
+    
     <div v-if="error" class="error">{{ error }}</div>
     <div class="grid2">
       <form class="card" @submit.prevent="add">

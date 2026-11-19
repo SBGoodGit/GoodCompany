@@ -9,7 +9,7 @@ async function submit() {
 </script>
 <template>
   <form class="card" @submit.prevent="submit">
-    <h1>Apply for a Community Bank loan</h1>
+    
     <p class="small muted">The loan money goes to your supplier through a sub-escrow, never to you. Interest: 4%, plus 0.25% per 6 months beyond 12 months (at most +3%). Early repayment is always allowed without penalty. A random sample of members votes.</p>
     <p class="small simulated">Simulated: no real money moves in MVP1.</p>
     <div class="grid2">

@@ -14,7 +14,7 @@ async function submit() {
 </script>
 <template>
   <form class="card" @submit.prevent="submit">
-    <h1>Post a job</h1>
+    
     <label for="title">Title</label><input id="title" v-model="form.title" required />
     <label for="description">Description</label><textarea id="description" v-model="form.description" />
     <div class="grid2">

@@ -5,7 +5,7 @@ onMounted(async () => { list.value = await api('/api/workspaces') })
 </script>
 <template>
   <div>
-    <h1>Negotiation Workspaces</h1>
+    <h2 class="section-title">Negotiation workspaces</h2>
     <div class="card">
       <p v-if="!list.length" class="muted">No workspaces yet. Contractors open one by responding to a job.</p>
       <table v-else>
